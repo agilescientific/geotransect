@@ -4,6 +4,23 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 import rasterio
+import fiona
+
+
+class transectContainer():
+
+    def __init__(self, transect_file):
+
+        with fiona.drivers(CPL_DEBUG=True):
+            with fiona.open(transect_file) as src:
+
+                self.bounds = src.bounds
+
+                # Assumes we have only one shape in the filter
+                for i in src.filter():
+
+                    self.coords = i["geometry"]["coordinates"]
+
 
 class seismicContainer():
 
