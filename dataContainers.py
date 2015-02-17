@@ -49,6 +49,7 @@ class lasContainer():
 
     def feature_plot(self, fig, axis, log):
 
+
         fig.add_subplot(axis)
 
         plt.plot(self.data.data[log], self.data.data['DEPT'])
