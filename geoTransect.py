@@ -21,6 +21,7 @@ las = lasContainer(las_file)
 elevation = elevationContainer(elevation_file)
 
 fig = plt.figure()
+
 # initialize the plot
 gs = gridspec.GridSpec(12, 12)
 
