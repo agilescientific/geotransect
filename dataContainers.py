@@ -1,6 +1,12 @@
 from obspy.segy.core import readSEGY
 from las import LASReader
-from matplotlib import pyplot as plt
+
+import fnmatch
+
+import os
+from itertools import product
+
+from matplotlib import pyplot as plt, gridspec
 import numpy as np
 
 import rasterio
@@ -9,17 +15,28 @@ from shapely.geometry import shape, mapping
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
+
+import pyproj as pp
+
 class transectContainer():
 
-    def __init__(self, transect_file, seismic_shape):
+    def __init__(self, transect_dir, seismic_shape,
+                 elevation_raster):
 
         self.seismic = seismicContainer(seismic_shape)
-        self.data = []
-        self.buffer = 1000.0
+        self.elevation = elevationContainer(elevation_raster)
         
-        for line in collection(transect_file):
+        self.data = []
+        self.buffer = 10000000000.0
+
+        for f in os.listdir(transect_dir):
+
+            if not f.endswith(".shp"):
+                continue
             
-            self.data.append(shape(line['geometry']))
+            for line in collection(os.path.join(transect_dir,f)):
+            
+                self.data.append(shape(line['geometry']))
 
             
         
@@ -27,7 +44,15 @@ class transectContainer():
     def plot(self):
 
         for transect in self.data:
-            print len(self.seismic.update(transect.buffer(self.buffer)))
+
+            fig = plt.figure()
+            gs = gridspec.GridSpec(12, 12)
+            
+            self.seismic.update(transect.buffer(self.buffer))
+                                
+            self.seismic.plot(fig, gs[6:,6:])
+
+            plt.show()
  
 
     
@@ -76,7 +101,7 @@ class seismicContainer():
         lookup_dict = {}
         prepared = prep(transect)
 
-        for point, meta  in zip(self.positions, self.metadata):
+        for point, meta in zip(self.positions, self.metadata):
 
             if prepared.contains(point):
 
@@ -84,7 +109,7 @@ class seismicContainer():
                     lookup_dict[meta["segyfile"]]["trace"].append(meta["trace"])
 
                     ## TODO Project onto the transect ##
-                    lookup_dict[meta["segyfile"]]["pos"].append(point.coords[:])
+                    lookup_dict[meta["segyfile"]]["pos"].append(point.coords[0])
                     
                 else:
                     lookup_dict[meta["segyfile"]] = {}
@@ -103,11 +128,11 @@ class seismicContainer():
 
             self.data.append([trace.data for trace in segy.traces])
 
-
+        
     def plot(self, fig, axis):
 
         fig.add_subplot(axis)
-        plt.imshow(self.data.traces, aspect='auto')
+        plt.imshow(np.array(self.data)[0,:,:], aspect='auto')
         plt.axis('off')
 
 class lasContainer():
@@ -139,15 +164,26 @@ class elevationContainer():
         with rasterio.drivers(CPL_DEBUG=True):
             with rasterio.open(elevation_file) as src:
                 self.data = src.read()[0,:,:]
-                self.res = src.res
+
+                # Get as lat/lon
+                xlat = np.arange(self.data.shape[0]) * src.affine[0]\
+                  + src.affine[2]
+                ylat = np.arange(self.data.shape[1]) * src.affine[1]\
+                  + src.affine[2]
+
+                wgs_grid = np.meshgrid(xlat,ylat)
+
+                ll_wgs84 = pp.Proj("+init=EPSG:4326")
+                utm_nad83 = pp.Proj("+proj=utm +zone=20T,"+
+                                    "+north +datum=NAD83 +units=m +"+
+                                    "no_defs")
+
+                self.coords = pp.transform(ll_wgs84, utm_nad83,
+                                           wgs_grid[0], wgs_grid[1])
                 
-    def plot(self, fig, axis, x1,x2,y1,y2):
+                                
+                
+    def plot(self, fig, axis):
 
-        fig.add_subplot(axis)
-        length = int(np.hypot(x2-x1, y2-y1))
-        x, y = np.linspace(x1, x2, length),np.linspace(y1, y2, length)
+        return
 
-        zi = self.data[x.astype(np.int), y.astype(np.int)]
-
-        plt.plot(zi)
-        plt.axis('off')
