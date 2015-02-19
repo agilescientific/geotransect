@@ -13,7 +13,9 @@ import logging
 
 from obspy.segy.core import readSEGY
 import fiona
+from fiona import crs
 from shapely.geometry import Point, LineString, mapping
+import pyproj as pp
 
 # Set up logging.
 log = logging.getLogger('lithlog')
@@ -29,8 +31,11 @@ ch.setLevel(logging.ERROR)
 ch.setFormatter(logging.Formatter(fstring))
 log.addHandler(ch)
 
+utm_nad27 = pp.Proj("+init=EPSG:26720")
+utm_nad83 = pp.Proj("+init=EPSG:26920")
 
-def sgy2shp(input_dir, output_dir):
+
+def sgy2shp(input_dir, output_dir, convert=False):
     """
     Extracts trace location from SEGY files and saves it in a
     shape file. A shape file is generated for each SEGY file.
@@ -49,7 +54,7 @@ def sgy2shp(input_dir, output_dir):
 
     with fiona.open(line_out_file, "w",
                     driver="ESRI Shapefile",
-                    crs=fiona.crs.from_epsg(26920),
+                    crs=crs.from_epsg(26920),
                     schema=line_schema) as line_out:
 
         for segyfile in os.listdir(input_dir):
@@ -80,7 +85,7 @@ def sgy2shp(input_dir, output_dir):
 
             with fiona.open(point_out_file, "w",
                             driver="ESRI Shapefile",
-                            crs=fiona.crs.from_epsg(26920),
+                            crs=crs.from_epsg(26920),
                             schema=point_schema) as trace_out:
 
                 for i, trace in enumerate(segy):
@@ -109,6 +114,10 @@ def sgy2shp(input_dir, output_dir):
                             y = y / 10.0
                     else:
                         pass
+
+                    if convert:
+                        log.info("Converting from NAD27 to NAD83")
+                        x, y = pp.transform(utm_nad27, utm_nad83, x, y)
 
                     p = Point(x, y)
                     points.append(p)
