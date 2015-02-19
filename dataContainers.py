@@ -55,7 +55,8 @@ class transectContainer():
             fig.add_subplot(gs[2:,4:])
             self.seismic.plot(self.extents)
 
-            
+
+            self.log.update(transect)
             fig.add_subplot(gs[2:,6:])
             self.log.plot(self.extents,"GR")
             fig.add_subplot(gs[2:12,0:3])
@@ -83,13 +84,18 @@ class seismicContainer():
     """
     def plot(self, extents):
 
-        gridx, gridy = \
-          np.meshgrid(self.coords,
-                      np.linspace(-5000,200,self.data.shape[0]))
+        if self.data.size > 0:
+            gridx, gridy = \
+            np.meshgrid(self.coords,
+                        np.linspace(-5000,200,self.data.shape[0]))
     
-        plt.pcolormesh(gridx, gridy,
-                       self.data,cmap='Greys')
-        plt.axis(extents)
+            plt.pcolormesh(gridx, gridy,
+                           self.data,
+                           cmap='Greys')
+            plt.axis(extents)
+            plt.pcolormesh(gridx + 10000, gridy,
+                           self.data,
+                           cmap='Greys')
         plt.axis('off')
 
     def __init__(self, seis_dir):
@@ -97,7 +103,7 @@ class seismicContainer():
         self.lookup = {}
         self.data = []
         self.coords = []
-        self.buffer = 10
+        self.buffer = 300.0
         
         for root, dirs, files in os.walk(seis_dir):
 
@@ -133,7 +139,8 @@ class seismicContainer():
         for point in points:
 
             meta = self.lookup[point]
-            
+
+      
             if(meta["segyfile"] in file_lookup):
 
                 ## project onto the transect
@@ -176,27 +183,77 @@ class seismicContainer():
         
 class lasContainer():
 
-    def __init__(self, las_file):
+    def __init__(self, las_dir):
 
-        self.data = LASReader(las_file, null_subs=np.nan)
+        # Read in the shape file
+        self.lookup = {}
+        self.data = []
+        self.coords = []
+        self.buffer = 300 # m
 
+        for root, dirs, files in os.walk(las_dir):
+
+            try:
+                shapefile = \
+                  os.path.join(root,fnmatch.filter(files,'*.shp')[0])
+            except:
+                continue
+
+
+            with collection(shapefile, "r") as logs:
+               
+                for log in logs:
+
+                    # add to the lookup table
+                    self.lookup[shape(log["geometry"])] =\
+                        log["properties"]
+
+
+    def update(self, transect):
+
+        prepared = prep(transect.buffer(self.buffer))
+
+        points = filter(prepared.contains, self.lookup.keys())
+
+        self.data = []
+        self.coords = []
+
+        for point in points:
+
+            meta = self.lookup[point]
+
+            name = meta["name"]
+            filename = os.path.join('data', 'wells', name,
+                                    'wireline_log', name +
+                                    '_out.LAS')
+
+            if not os.path.exists(filename): continue
+            self.data.append(LASReader(filename, null_subs=np.nan))
+            self.coords.append(transect.project(point))
+
+            
     def plot(self, extents, log):
 
-        data = np.nan_to_num(self.data.data[log])
-        data /= np.amax(data)
-        data *= .1*(extents[1] - extents[0])
-        data +=  .5*(extents[1])
+        for las, pos in zip(self.data, self.coords):
+            data = np.nan_to_num(las.data[log])
+            data /= np.amax(data)
+            data *= .1*(extents[1] - extents[0])
+            data += pos
         
-        plt.plot(data, -self.data.data['DEPT'])
+            plt.plot(data, -las.data['DEPT'])
         
-        plt.xlim((extents[0], extents[1]))
-        plt.ylim((extents[2], extents[3]))
+            plt.xlim((extents[0], extents[1]))
+            plt.ylim((extents[2], extents[3]))
         
-        plt.axis("off")
+            plt.axis("off")
+        plt.axis('off')
+            
 
     def feature_plot(self, log):
 
-        plt.plot(self.data.data[log], self.data.data['DEPT'])
+        if self.data:
+            plt.plot(self.data[0].data[log],
+                     self.data[0].data['DEPT'])
         
         
 
@@ -229,9 +286,7 @@ class elevationContainer():
 
                 # TODO make sure these projections are legitimate
                 ll_wgs84 = pp.Proj("+init=EPSG:4269")
-                utm_nad83 = pp.Proj("+proj=utm +zone=20T,"+
-                                    "+north +datum=NAD83 +units=m +"+
-                                    "no_defs")
+                utm_nad83 = pp.Proj("+init=EPSG:26920")
 
                 self.elevation_grid = pp.transform(ll_wgs84,
                                                    utm_nad83,
@@ -248,17 +303,19 @@ class elevationContainer():
         self.coords = np.zeros(nsamples)
         self.data = np.zeros(nsamples)
 
-        for i,n in enumerate(np.linspace(0,
-                                         transect.length, nsamples)):
+        for i,n in enumerate(np.linspace(0,transect.length,
+                                         nsamples)):
 
             # interpolate along the transect
             x,y = transect.interpolate(n).xy
 
-            # Get the closest elevation points
-            xi = np.abs(self.elevation_grid[0][:,0] - x).argmin()
-            yi = np.abs(self.elevation_grid[1][0,:] - y).argmin()
 
-            self.data[i] = self.elevation_profile[xi,yi]
+            # Get the closest elevation points
+            xi = np.abs(self.elevation_grid[0][0,:] - x).argmin()
+            yi = np.abs(self.elevation_grid[1][:,0] - y).argmin()
+
+         
+            self.data[i] = self.elevation_profile[yi,xi]
             
             # add the distance to the coordinates
             self.coords[i] = n

@@ -1,7 +1,8 @@
 
 import fnmatch
 from obspy.segy.core import readSEGY
-from fiona import collection
+import fiona
+from fiona import collection, crs
 from shapely.geometry import Point, mapping
 import os
 import sys
@@ -32,8 +33,11 @@ def segy2shape(input_dir, output_dir):
                         unpack_trace_header=True)
         schema = { 'geometry': 'Point',
                    'properties': {'segyfile': 'str', 'trace':'int' }}
-        
-        with collection(outfile,"w", "ESRI Shapefile", schema) as output:
+
+
+        with fiona.open(outfile, 'w', driver='ESRI Shapefile',
+                        crs=crs.from_epsg(26920),
+                        schema=schema) as output:
 
             for i, trace in enumerate(segy):
 
@@ -51,6 +55,17 @@ def segy2shape(input_dir, output_dir):
                 x = float(header.source_coordinate_x)*coord_gain
                 y = float(header.source_coordinate_y)*coord_gain
 
+                if x > 9e5 or y > 55e6:
+                    if x > 9e6 or y > 55e7:
+                        print ('found weird geometries: dividing by 100!')
+                        x = x / 100.0
+                        y = y / 100.0 
+                    else: 
+                        print ('found weird geometries: dividing by 10!')
+                        x = x / 10.0
+                        y = y / 10.0 
+                else:
+                    pass
                 p = Point(x,y)
                 output.write({
                 'properties': {
