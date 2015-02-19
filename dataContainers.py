@@ -48,22 +48,24 @@ class transectContainer():
 
         for transect in self.data:
 
+            self.extents[1] = transect.length
+
             fig = plt.figure()
             gs = gridspec.GridSpec(12, 12)
             
             self.seismic.update(transect)
-            fig.add_subplot(gs[2:,4:])
+            fig.add_subplot(gs[2:10,4:])
             self.seismic.plot(self.extents)
 
 
             self.log.update(transect)
-            fig.add_subplot(gs[2:,6:])
+            fig.add_subplot(gs[2:10,6:])
             self.log.plot(self.extents,"GR")
             fig.add_subplot(gs[2:12,0:3])
             self.log.feature_plot("GR")
            
             self.elevation.update(transect)
-            fig.add_subplot(gs[0:1,4:])
+            fig.add_subplot(gs[0:2,4:])
             self.elevation.plot(self.extents)
 
             plt.show()
@@ -87,14 +89,15 @@ class seismicContainer():
 
         # Loop through each seismic line
         for coords, data in zip(self.coords, self.data):
-            
-            gridx, gridy = \
-            np.meshgrid(coords,
-                        np.linspace(-5000,200,data.shape[0]))
-    
-            plt.pcolormesh(gridx, gridy,
-                           data,
-                           cmap='Greys')
+
+            z0 = 0
+            depth = 5000
+            plt.imshow(data,
+                       extent=[np.amin(coords),
+                               np.amax(coords),
+                               depth, z0],
+                               aspect="auto",
+                       cmap="Greys")
             plt.axis(extents)
 
     
@@ -168,7 +171,7 @@ class seismicContainer():
             idx = sorted(range(len(traces)), key=lambda k: traces[k])
             
             self.data.append(np.transpose(np.array(
-                [segy.traces[i].data for i in idx])))
+                [segy.traces[traces[i]].data for i in idx])))
             
             self.coords.append(np.array([coords[i] for i in idx]))
             
@@ -232,7 +235,7 @@ class lasContainer():
             data *= .1*(extents[1] - extents[0])
             data += pos
         
-            plt.plot(data, -las.data['DEPT'])
+            plt.plot(data, las.data['DEPT'])
         
             plt.xlim((extents[0], extents[1]))
             plt.ylim((extents[2], extents[3]))
