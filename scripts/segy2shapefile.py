@@ -4,6 +4,8 @@
 Crawl a tree for SEGY files, read their trace locations, and
 make a shapefile containing the surface traces of the lines.
 
+This file is obsolete, please use sgy2shp.py.
+
 """
 from __future__ import print_function
 import csv
