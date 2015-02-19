@@ -16,6 +16,7 @@ from shapely.geometry import shape, mapping, LineString
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
+from plot_lib import elevation_plot
 
 import pyproj as pp
 
@@ -28,6 +29,8 @@ class transectContainer():
         self.seismic = seismicContainer(seismic_shape)
         self.elevation = elevationContainer(elevation_raster)
         self.log = lasContainer(las_file)
+
+        self.dummy = dummyContainer()
         
         self.data = []
    
@@ -68,6 +71,15 @@ class transectContainer():
             fig.add_subplot(gs[0:2,4:])
             self.elevation.plot(self.extents)
 
+            self.dummy.update(transect)
+            fig.add_subplot(gs[10:11,4:])
+            self.dummy.plot(self.extents)
+
+            
+            self.dummy.update(transect)
+            fig.add_subplot(gs[11:,4:])
+            self.dummy.plot(self.extents)
+            
             plt.show()
  
 
@@ -100,7 +112,13 @@ class seismicContainer():
                        cmap="Greys")
             plt.axis(extents)
 
-    
+        plt.ylabel("Depth [m]",fontsize = 8)
+        #plt.xlabel("Transect range [m]", fontsize = 8)
+
+        plt.tick_params(axis='y', which='major', labelsize=8)
+        plt.tick_params(axis='y', which='minor', labelsize=8)
+        
+        plt.xticks(plt.xticks()[0],[])
 
     def __init__(self, seis_dir):
 
@@ -235,7 +253,8 @@ class lasContainer():
             data *= .1*(extents[1] - extents[0])
             data += pos
         
-            plt.plot(data, las.data['DEPT'])
+            plt.plot(data, las.data['DEPT'],
+                     'g', lw = 0.5, alpha = 0.5)
         
             plt.xlim((extents[0], extents[1]))
             plt.ylim((extents[2], extents[3]))
@@ -318,11 +337,30 @@ class elevationContainer():
 
     def plot(self, extents):
 
-        plt.plot(self.coords, self.data)
-        plt.xlim((extents[0], extents[1]))
-        plt.axis('off')
-
-    
-
+        elevation_plot(self.coords, self.data,
+                       [extents[0], extents[1]])
         
 
+class dummyContainer():
+    # Random number generator for testing
+
+
+    def __init__(self):
+
+        self.data = []
+        self.coords = []
+
+
+    def update(self, transect):
+
+        self.coords = np.linspace(0, transect.length, 1000)
+        self.data = np.random.randn(self.coords.size)
+
+    def plot(self, extents):
+
+        plt.plot(self.coords, self.data)
+
+        plt.xlim((extents[0], extents[1]))
+
+        plt.axis('off')
+    
