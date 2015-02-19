@@ -84,19 +84,20 @@ class seismicContainer():
     """
     def plot(self, extents):
 
-        if self.data.size > 0:
+
+        # Loop through each seismic line
+        for coords, data in zip(self.coords, self.data):
+            
             gridx, gridy = \
-            np.meshgrid(self.coords,
-                        np.linspace(-5000,200,self.data.shape[0]))
+            np.meshgrid(coords,
+                        np.linspace(-5000,200,data.shape[0]))
     
             plt.pcolormesh(gridx, gridy,
-                           self.data,
+                           data,
                            cmap='Greys')
             plt.axis(extents)
-            plt.pcolormesh(gridx + 10000, gridy,
-                           self.data,
-                           cmap='Greys')
-        plt.axis('off')
+
+    
 
     def __init__(self, seis_dir):
 
@@ -105,14 +106,10 @@ class seismicContainer():
         self.coords = []
         self.buffer = 300.0
         
-        for root, dirs, files in os.walk(seis_dir):
+        for f in fnmatch.filter(os.listdir(seis_dir), '.*.shp'):
 
-            try:
-                shapefile = \
-                  os.path.join(root,fnmatch.filter(files,'*.shp')[0])
-            except:
-                continue
-            
+            shapefile = os.path.join(seis_dir, f)
+        
             with collection(shapefile, "r") as traces:
 
                 for trace in traces:
@@ -170,16 +167,11 @@ class seismicContainer():
             # sort the traces
             idx = sorted(range(len(traces)), key=lambda k: traces[k])
             
-            self.data = self.data + \
-              [segy.traces[i].data
-               for i in idx]
+            self.data.append(np.transpose(np.array(
+                [segy.traces[i].data for i in idx])))
             
-            self.coords = self.coords + [coords[i] for i in idx]
+            self.coords.append(np.array([coords[i] for i in idx]))
             
-            
-        # Cast into arrays
-        self.data = np.flipud(np.transpose(np.array(self.data)))
-        self.coords = np.array(self.coords)
         
 class lasContainer():
 

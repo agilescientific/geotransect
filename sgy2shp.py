@@ -13,6 +13,7 @@ import logging
 
 from obspy.segy.core import readSEGY
 import fiona
+from fiona import crs
 from shapely.geometry import Point, LineString, mapping
 
 # Set up logging.
@@ -49,7 +50,7 @@ def sgy2shp(input_dir, output_dir):
 
     with fiona.open(line_out_file, "w",
                     driver="ESRI Shapefile",
-                    crs=fiona.crs.from_epsg(26920),
+                    crs=crs.from_epsg(26920),
                     schema=line_schema) as line_out:
 
         for segyfile in os.listdir(input_dir):
@@ -68,7 +69,8 @@ def sgy2shp(input_dir, output_dir):
 
             points = []
 
-            point_out_file = os.path.join(output_dir, "."+filebase)
+            point_out_file = os.path.join(output_dir, "." +
+                                          filebase +'.shp')
 
             # Set up the shapefile schema.
             point_schema = {'geometry': 'Point',
@@ -80,7 +82,7 @@ def sgy2shp(input_dir, output_dir):
 
             with fiona.open(point_out_file, "w",
                             driver="ESRI Shapefile",
-                            crs=fiona.crs.from_epsg(26920),
+                            crs=crs.from_epsg(26920),
                             schema=point_schema) as trace_out:
 
                 for i, trace in enumerate(segy):
