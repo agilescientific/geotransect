@@ -30,7 +30,7 @@ ch.setFormatter(logging.Formatter(fstring))
 log.addHandler(ch)
 
 
-def segy2shape(input_dir, output_dir):
+def sgy2shp(input_dir, output_dir):
     """
     Extracts trace location from SEGY files and saves it in a
     shape file. A shape file is generated for each SEGY file.
@@ -127,7 +127,7 @@ def main():
     input_dir = sys.argv[1]
     output_dir = sys.argv[2]
 
-    segy2shape(input_dir, output_dir)
+    sgy2shp(input_dir, output_dir)
 
 if __name__ == "__main__":
     main()
