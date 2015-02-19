@@ -41,13 +41,16 @@ def sgy2shp(input_dir, output_dir):
 
     line_out_file = os.path.join(output_dir, "seismic_lines.shp")
     # Set up the shapefile schema.
-    schema = {'geometry': 'LineString',
-              'properties': {'file': 'str', 'line': 'str'}}
+    line_schema = {'geometry': 'LineString',
+                   'properties': {'segyfile': 'str',
+                                  'line': 'str'
+                                  }
+                   }
 
     with fiona.open(line_out_file, "w",
                     driver="ESRI Shapefile",
                     crs=fiona.crs.from_epsg(26920),
-                    schema=schema) as line_out:
+                    schema=line_schema) as line_out:
 
         for segyfile in os.listdir(input_dir):
 
@@ -70,7 +73,7 @@ def sgy2shp(input_dir, output_dir):
             # Set up the shapefile schema.
             point_schema = {'geometry': 'Point',
                             'properties': {'line': 'str',
-                                           'file': 'str',
+                                           'segyfile': 'str',
                                            'trace': 'int'
                                            }
                             }
@@ -111,13 +114,13 @@ def sgy2shp(input_dir, output_dir):
                     points.append(p)
                     trace_out.write({'geometry': mapping(p),
                                      'properties': {'line': filebase,
-                                                    'file': path,
+                                                    'segyfile': path,
                                                     'trace': i}
                                      })
 
             linestring = LineString(points)
             line_out.write({'geometry': mapping(linestring),
-                            'properties': {'file': path,
+                            'properties': {'segyfile': path,
                                            'line': filebase}
                             })
 
