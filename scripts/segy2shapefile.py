@@ -1,5 +1,10 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Crawl a tree for SEGY files, read their trace locations, and
+make a shapefile containing the surface traces of the lines.
 
+"""
 from __future__ import print_function
 import csv
 import sys
