@@ -103,7 +103,7 @@ class seismicContainer():
         self.lookup = {}
         self.data = []
         self.coords = []
-        self.buffer = 1000000.0
+        self.buffer = 300.0
         
         for root, dirs, files in os.walk(seis_dir):
 
@@ -139,7 +139,8 @@ class seismicContainer():
         for point in points:
 
             meta = self.lookup[point]
-            
+
+      
             if(meta["segyfile"] in file_lookup):
 
                 ## project onto the transect
@@ -188,7 +189,7 @@ class lasContainer():
         self.lookup = {}
         self.data = []
         self.coords = []
-        self.buffer = 100000000000 # m
+        self.buffer = 300 # m
 
         for root, dirs, files in os.walk(las_dir):
 
@@ -200,7 +201,7 @@ class lasContainer():
 
 
             with collection(shapefile, "r") as logs:
-                print logs
+               
                 for log in logs:
 
                     # add to the lookup table
@@ -302,17 +303,19 @@ class elevationContainer():
         self.coords = np.zeros(nsamples)
         self.data = np.zeros(nsamples)
 
-        for i,n in enumerate(np.linspace(0,
-                                         transect.length, nsamples)):
+        for i,n in enumerate(np.linspace(0,transect.length,
+                                         nsamples)):
 
             # interpolate along the transect
             x,y = transect.interpolate(n).xy
 
-            # Get the closest elevation points
-            xi = np.abs(self.elevation_grid[0][:,0] - x).argmin()
-            yi = np.abs(self.elevation_grid[1][0,:] - y).argmin()
 
-            self.data[i] = self.elevation_profile[xi,yi]
+            # Get the closest elevation points
+            xi = np.abs(self.elevation_grid[0][0,:] - x).argmin()
+            yi = np.abs(self.elevation_grid[1][:,0] - y).argmin()
+
+         
+            self.data[i] = self.elevation_profile[yi,xi]
             
             # add the distance to the coordinates
             self.coords[i] = n
