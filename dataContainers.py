@@ -47,7 +47,7 @@ class transectContainer():
     """
     
     def __init__(self, transect_dir, seismic_dir,
-                 elevation_raster, las_file, extents):
+                 elevation_raster, las_dir, extents):
 
         self.extents = extents
 

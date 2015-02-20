@@ -19,7 +19,8 @@ def colorline(x, y, z=None, cmap=plt.get_cmap('copper'),
         z = y
            
     # Special case if a single number:
-    if not hasattr(z, "__iter__"):  # to check for numerical input -- this is a hack
+    # to check for numerical input -- this is a hack
+    if not hasattr(z, "__iter__"):  
         z = np.array([z])
         
     z = np.asarray(z)
@@ -28,18 +29,18 @@ def colorline(x, y, z=None, cmap=plt.get_cmap('copper'),
         norm = plt.Normalize(np.amin(y), np.amin(y))
     
     segments = make_segments(x, y)
-    lc = LineCollection(segments, array=z, cmap=cmap, norm=norm, linewidth=linewidth, alpha=alpha)
-    
-    #ax = plt.gca()
-    #ax.add_collection(lc)
+    lc = LineCollection(segments, array=z, cmap=cmap, norm=norm,
+                        linewidth=linewidth, alpha=alpha)
     
     return lc
 
 
 def make_segments(x, y):
     '''
-    Create list of line segments from x and y coordinates, in the correct format for LineCollection:
-    an array of the form   numlines x (points per line) x 2 (x and y) array
+    Create list of line segments from x and y coordinates,
+    in the correct format for LineCollection:
+    an array of the form   numlines x (points per line) x 2 (x and y)
+    array
     '''
 
     points = np.array([x, y]).T.reshape(-1, 1, 2)
@@ -71,4 +72,73 @@ def elevation_plot(x, elevs, xlim):
     plt.grid(True)
     plt.text(0.0, 2*(np.ptp(elevs)), "Elevation [m]",
              props, rotation=0)
+
+
+def plot_striplog(ax, striplog, legend, width=1, ladder=False,
+                  summaries=False, minthick=1, alpha=0.75):
+    
+    for t, b, l in zip(striplog['tops'],striplog['bases'],
+                       striplog['liths']):
+        origin = (0, t)
+        colour = '#' + l['map colour'].strip()
+        thick = b - t
+        
+        if ladder:
+            w = legend[colour[1:]]['width']
+        else:
+            w = width
+            
+        rect = Rectangle(origin, w, thick, color=colour,
+                         edgecolor='k', linewidth=1.0, alpha=alpha)
+        ax.add_patch(rect)
+
+        if summaries:
+            if thick >= minthick:
+                ax.text(6, t+thick/2, summarize(l),
+                        verticalalignment='center')
+
+    return ax
+
+
+def get_curve_params(abbrev, fname):
+    """
+    returns a dictionary of petrophysical parameters for 
+    plotting purposes
+    """
+    params = {}
+    with open(fname, 'rU') as csvfile:
+        reader = csv.DictReader(csvfile) 
+        for row in reader:
+            if row['acronymn'] == abbrev:
+                params['acronymn'] = row['acronymn']
+                params['track'] = int(row['track'])
+                params['units'] = row['units']
+                params['xleft'] = float(row['xleft'])
+                params['xright'] = float(row['xright'])
+                params['logarithmic'] = row['logarithmic']
+                params['hexcolor']= row['hexcolor']
+                params['fill_left_cond']= bool(row['fill_left_cond'])
+                params['fill_left']= row['fill_left']
+                params['fill_right_cond']= bool(row['fill_right_cond'])
+                params['fill_right']= row['fill_right']
+                params['xticks'] = row['xticks'].split(',')
+    return params
+
+def rolling_window(a, window):
+        shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
+        strides = a.strides + (a.strides[-1],)
+        rolled = np.lib.stride_tricks.as_strided(a, 
+                                                 shape=shape, 
+                                                 strides=strides)
+        rolled = np.median(rolled, -1)
+        rolled = np.pad(rolled, window/2, mode='edge')
+        return rolled
+    
+def despike(curve, curve_sm, max_clip): 
+    spikes = np.where(curve - curve_sm > max_clip)[0]
+    spukes = np.where(curve_sm - curve > max_clip)[0]
+    out = np.copy(curve)
+    out[spikes] = curve_sm[spikes] + max_clip  # Clip at the max allowed diff
+    out[spukes] = curve_sm[spukes] - max_clip  # Clip at the min allowed diff
+    return out
 
