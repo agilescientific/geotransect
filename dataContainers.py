@@ -21,20 +21,49 @@ from plot_lib import elevation_plot
 import pyproj as pp
 
 class transectContainer():
+    """
+    Main driver class for generating transect plots. Builds and
+    accesses all other plot containers
 
-    def __init__(self, transect_dir, seismic_shape,
+    usage:
+    tc = transectContainer(transect_dir, seismic_dir,
+                           elevation_raster, las_dir,
+                           extents)
+
+    @param transect_dir: Directory containing shape files of the
+                         transects.
+    @param seismic_dir: Directory containing the shape files of
+                        the SEGY trace headers.
+    @param elevation_raster: Raster file of the entire elevation
+                             profile.
+    @param las_dir: Directory containing shape files for well log
+                    headers.
+
+    @param extents: X and depth limits of the plot (X0,X1, Z0, Z1)
+
+    @returns a transectContainer object.
+
+    tc.plot() to generate transect plots
+    """
+    
+    def __init__(self, transect_dir, seismic_dir,
                  elevation_raster, las_file, extents):
 
         self.extents = extents
-        self.seismic = seismicContainer(seismic_shape)
-        self.elevation = elevationContainer(elevation_raster)
-        self.log = lasContainer(las_file)
 
+        # make the data objects
+        self.seismic = seismicContainer(seismic_dir)
+        self.elevation = elevationContainer(elevation_raster)
+        self.log = lasContainer(las_dir)
+
+        # Place holder for em/gravity etc...
         self.dummy = dummyContainer()
-        
+
+        # initialize transect list
         self.data = []
    
 
+        # Read in all shape files
         for f in os.listdir(transect_dir):
 
             if not f.endswith(".shp"):
@@ -48,34 +77,43 @@ class transectContainer():
         
 
     def plot(self):
+        """
+        Generates transect plots for each transect line
+        """
 
         for transect in self.data:
 
+            # Set the extent to the length? Or keep them all the same?
             self.extents[1] = transect.length
 
+            # Make the figure and layout
             fig = plt.figure()
             gs = gridspec.GridSpec(12, 12)
-            
+
+            # Update the seismic data and plot
             self.seismic.update(transect)
             fig.add_subplot(gs[2:10,4:])
             self.seismic.plot(self.extents)
 
-
+            # Update the log data and plot
             self.log.update(transect)
             fig.add_subplot(gs[2:10,6:])
             self.log.plot(self.extents,"GR")
+
+            # Do the composite/feature plot
             fig.add_subplot(gs[2:12,0:3])
-            self.log.feature_plot("GR")
-           
+            self.log.feature_plot()
+
+            # Update and plot the elevation
             self.elevation.update(transect)
             fig.add_subplot(gs[0:2,4:])
             self.elevation.plot(self.extents)
 
+            # Dummy plots are place holders for EM/Gravity/Attributes
             self.dummy.update(transect)
             fig.add_subplot(gs[10:11,4:])
             self.dummy.plot(self.extents)
 
-            
             self.dummy.update(transect)
             fig.add_subplot(gs[11:,4:])
             self.dummy.plot(self.extents)
@@ -93,11 +131,41 @@ class seismicContainer():
     seis = seismicContainer(seis_dir)
 
     @param seis_dir: Input directory containing seismic shapefiles.
-    The shapefiles contain points corresponding to UTM trace locations
-    with properties segyfile, trace.
-    """
-    def plot(self, extents):
+                     The shapefiles contain points corresponding to
+                     UTM trace locations with fields segyfile,
+                     trace.
 
+    @returns a seismicContainer object
+    """
+    def __init__(self, seis_dir):
+
+        self.lookup = {}    # Look up table for points: segy/trace
+        self.data = []      # plotting data
+        self.coords = []    # transect coords of plot data
+        self.buffer = 300.0 # [m] of buffer for transect association
+
+        
+        for f in fnmatch.filter(os.listdir(seis_dir), '.*.shp'):
+
+            shapefile = os.path.join(seis_dir, f)
+        
+            with collection(shapefile, "r") as traces:
+
+                for trace in traces:
+
+                    # Map a point object to trace properties
+                    # (segyfile, trace)
+                    self.lookup[shape(trace["geometry"])] =\
+                                trace["properties"]
+
+                                
+    def plot(self, extents):
+        """
+        Plots a seismic section.
+
+        @param extents: The range and depth extents of the axes.
+                        (x0,x1,z0,z1)
+        """
 
         # Loop through each seismic line
         for coords, data in zip(self.coords, self.data):
@@ -120,55 +188,44 @@ class seismicContainer():
         
         plt.xticks(plt.xticks()[0],[])
 
-    def __init__(self, seis_dir):
-
-        self.lookup = {}
-        self.data = []
-        self.coords = []
-        self.buffer = 300.0
-        
-        for f in fnmatch.filter(os.listdir(seis_dir), '.*.shp'):
-
-            shapefile = os.path.join(seis_dir, f)
-        
-            with collection(shapefile, "r") as traces:
-
-                for trace in traces:
-
-                    self.lookup[shape(trace["geometry"])] =\
-                                trace["properties"]
-                    
+    
                     
     def update(self, transect):
         """
-        Updates the data to data that intersects the transect line.
+        Updates the container data to traces that intersect
+        the transect line.
 
-        @param transect: A transect line as a buffered shapely object.
+        @param transect: A transect line as a shapely LineString
+                         object.
         """
         
+        # Preprocessing
         prepared = prep(transect.buffer(self.buffer))
 
+        # Get intersecting points
         points = filter(prepared.contains, self.lookup.keys())
 
+        # Reset data
         self.data = []
         self.coords = []
 
+        # Lookup for grouping traces into segy files
         file_lookup = {}
         for point in points:
 
             meta = self.lookup[point]
-
       
             if(meta["segyfile"] in file_lookup):
 
-                ## project onto the transect
+                # project onto the transect line
                 proj_d = transect.project(point)
 
                 if proj_d:
                     file_lookup[meta["segyfile"]]["pos"].append(proj_d)
-                    file_lookup[meta["segyfile"]]["trace"].append(meta["trace"])               
+                    file_lookup[meta["segyfile"]]["trace"].append(meta["trace"])
+
                     
-            else:
+            else: ## Make a new dict entry
                 
                 file_lookup[meta["segyfile"]] = {}
                 file_lookup[meta["segyfile"]]["trace"] = \
@@ -185,7 +242,7 @@ class seismicContainer():
             traces = file_lookup[segyfile]["trace"]
             coords = file_lookup[segyfile]["pos"]
 
-            # sort the traces
+            # sort the traces to be in order
             idx = sorted(range(len(traces)), key=lambda k: traces[k])
             
             self.data.append(np.transpose(np.array(
@@ -195,14 +252,24 @@ class seismicContainer():
             
         
 class lasContainer():
+    """
+    Container for managing and plotting LAS data.
 
+    usage:
+
+    lc = lasContainer(las_dir)
+
+    @param las_dir: Directory shape files of LAS headers.
+
+    @returns an lasContainer object/
+    """
     def __init__(self, las_dir):
 
         # Read in the shape file
-        self.lookup = {}
-        self.data = []
-        self.coords = []
-        self.buffer = 300 # m
+        self.lookup = {}   # maps points to LAS filenames
+        self.data = []     # plot data
+        self.coords = []   # transect coords of plot data
+        self.buffer = 300  # [m] buffer for transect association
 
         for root, dirs, files in os.walk(las_dir):
 
@@ -223,11 +290,21 @@ class lasContainer():
 
 
     def update(self, transect):
+        """
+        Updates the container data to wells that intersect the
+        transect line.
 
+        @param transect: A transect line as a shapely LineString
+                         object.
+        """
+
+        # Preprocess
         prepared = prep(transect.buffer(self.buffer))
 
+        # Get the intersecting points
         points = filter(prepared.contains, self.lookup.keys())
 
+        # reset the data
         self.data = []
         self.coords = []
 
@@ -240,16 +317,33 @@ class lasContainer():
                                     'wireline_log', name +
                                     '_out.LAS')
 
+            # Write out an error log?
             if not os.path.exists(filename): continue
+
+            # store the transecting data
             self.data.append(LASReader(filename, null_subs=np.nan))
             self.coords.append(transect.project(point))
 
             
     def plot(self, extents, log):
+        """
+        Plots the log data.
+
+        @param extents: The range and depth extents of the axes.
+                        (x0,x1,z0,z1)
+
+        @param log: Name of the curve to plot. (maybe this should be
+                    an object property?)
+        """
 
         for las, pos in zip(self.data, self.coords):
+
             data = np.nan_to_num(las.data[log])
+
+            # normalize
             data /= np.amax(data)
+
+            # scale position
             data *= .1*(extents[1] - extents[0])
             data += pos
         
@@ -263,24 +357,42 @@ class lasContainer():
         plt.axis('off')
             
 
-    def feature_plot(self, log):
+    def feature_plot(self):
+        """
+        Creates an elaborate composite well log plot
+        """
 
         if self.data:
-            plt.plot(self.data[0].data[log],
+            plt.plot(self.data[0].data['GR'],
                      self.data[0].data['DEPT'])
         
         
 
 class elevationContainer():
+    """
+    Container for managing and plotting elevation data.
 
+    usage:
+    ec = elevationContainer(elevation_raster)
+
+    @param elevation_raster: Raster file containing the elevation
+                             profile of the area of interest.
+
+    @returns an elevationContainer object.
+    """
+
+    
     def __init__(self, elevation_file):
 
+        # entire data set and grid
         self.elevation_profile = []
         self.elevation_grid = []
 
+        # plotting data and transect coordinates
         self.data = []
         self.coords = []
 
+        # decimation factor
         decimate = 1
         
         with rasterio.drivers(CPL_DEBUG=True):
@@ -298,7 +410,8 @@ class elevationContainer():
 
                 wgs_grid = np.meshgrid(lat,lon)
 
-                # TODO make sure these projections are legitimate
+                # Maybe these should be config params and not hard
+                # coded?
                 ll_wgs84 = pp.Proj("+init=EPSG:4269")
                 utm_nad83 = pp.Proj("+init=EPSG:26920")
 
@@ -310,6 +423,13 @@ class elevationContainer():
                                 
 
     def update(self, transect):
+        """
+        Updates the container data to a profile that intersect the
+        transect line.
+
+        @param transect: A transect line as a shapely LineString
+                         object.
+        """
         
         # transect coords need to be upsampled
         nsamples = 100
@@ -323,7 +443,6 @@ class elevationContainer():
             # interpolate along the transect
             x,y = transect.interpolate(n).xy
 
-
             # Get the closest elevation points
             xi = np.abs(self.elevation_grid[0][0,:] - x).argmin()
             yi = np.abs(self.elevation_grid[1][:,0] - y).argmin()
@@ -336,7 +455,14 @@ class elevationContainer():
 
 
     def plot(self, extents):
+        """
+        Plots the elevation profile.
+        @uses elevation_plot
 
+        @param extents: Plot extents (x0,x1,z0,z1). Only x0 and x1
+                        are used.
+        """
+        
         elevation_plot(self.coords, self.data,
                        [extents[0], extents[1]])
         

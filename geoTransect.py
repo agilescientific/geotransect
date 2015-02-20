@@ -11,6 +11,6 @@ extents = [0,40000, 6000,0]
 tc = transectContainer(transect_file, seismic_dir, elevation_file,
                        las_shape, extents)
 
-
+# Make the plots
 tc.plot()
 
