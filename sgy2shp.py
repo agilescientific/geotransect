@@ -73,7 +73,8 @@ def sgy2shp(input_dir, output_dir, convert=False):
 
             points = []
 
-            point_out_file = os.path.join(output_dir, "."+filebase)
+            point_out_file = os.path.join(output_dir, "." +
+                                          filebase +'.shp')
 
             # Set up the shapefile schema.
             point_schema = {'geometry': 'Point',
