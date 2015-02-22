@@ -4,7 +4,14 @@ The main class defined here is LASReader, a class that reads a LAS file
 and makes the data available as a Python object.
 """
 
+# Slowly updating to LAS 3.0
+# Copyright (c) 2015, Matt Hall, Agile Geoscience
+#
+# Original code
 # Copyright (c) 2011, Warren Weckesser
+#
+# Licensed under the terms of the ISC License
+# http://www.isc.org/downloads/software-support-policy/isc-license/
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -101,10 +108,10 @@ def _read_wrapped_row(f, n):
 
     Returns the list of floats read from the file.
     """
-    depth = float(f.readline().strip())
+    depth = float(f.readline().strip(r', \t'))
     values = [depth]
     while len(values) < n:
-        new_values = [float(s) for s in f.readline().split()]
+        new_values = [float(s.strip(r', \t')) for s in f.readline().split()]
         values.extend(new_values)
     return values
 
@@ -175,7 +182,7 @@ class LASReader(object):
 
     Constructor
     -----------
-    LASReader(f, null_subs=None)
+    LASReader(f, null_subs=None, unknown_as_other=False)
 
     f : file object or string
         If f is a file object, it must be opened for reading.
@@ -256,13 +263,19 @@ class LASReader(object):
 
     """
 
-    def __init__(self, f, null_subs=None):
+    def __init__(self, f, null_subs=None, unknown_as_other=False):
         """f can be a filename (str) or a file object.
 
         If 'null_subs' is not None, its value replaces any values in the data
         that matches the NULL value specified in the Version section of the LAS
         file.
         """
+
+        # This is a hack to allow loading random LAS3-style sections
+        # Of course it would be better to do this properly...
+        self.unknown_as_other = unknown_as_other
+
+        self.dlm = None
         self.null = None
         self.null_subs = null_subs
         self.start = None
@@ -279,13 +292,15 @@ class LASReader(object):
         self.other = ''
         self.data = None
 
-        self._read_las(f)
+        self._read_las(f, unknown_as_other)
 
-        self.data2d = self.data.view(float).reshape(-1, len(self.curves.items))
-        if null_subs is not None:
-            self.data2d[self.data2d == self.null] = null_subs
+        if self.data is not None:
+            c = len(self.curves.items)
+            self.data2d = self.data.view(float).reshape(-1, c)
+            if null_subs is not None:
+                self.data2d[self.data2d == self.null] = null_subs
 
-    def _read_las(self, f):
+    def _read_las(self, f, unknown_as_other):
         """Read a LAS file.
 
         Returns a dictionary with keys 'V', 'W', 'C', 'P', 'O' and 'A',
@@ -296,6 +311,11 @@ class LASReader(object):
         log data.  The field names of the array are the mnemonics from the
         Curve section of the file.
         """
+
+        # Allowed Column Data delimiters (DLM)s from Appendix II of
+        # www.cwls.org/wp-content/uploads/2014/09/LAS_3_File_Structure.pdf
+        delimiters = {'SPACE': ' ', 'TAB': '\t', 'COMMA': ','}
+
         opened_here = False
         if isinstance(f, basestring):
             opened_here = True
@@ -306,9 +326,12 @@ class LASReader(object):
         line = f.readline()
         current_section = None
         current_section_label = ''
-        while not line.startswith('~A'):
-            if not line.startswith('#'):
-                if line.startswith('~'):
+        while line and not line.startswith('~A'):  # Data: see below this while.
+            blank = re.search(r'\w', line) is None  # True if line is blank.
+            comment = line.startswith('#')
+            if not blank and not comment:
+                # Then not blank or comment.
+                if line.startswith('~'):  # Section definition.
                     if len(line) < 2:
                         raise LASError("Missing section character after '~'.")
                     current_section_label = line[1:2]
@@ -323,6 +346,10 @@ class LASReader(object):
                         current_section = self.parameters
                     elif current_section_label == 'O':
                         current_section = self.other
+                        other = True
+                    elif unknown_as_other:
+                        current_section = self.other
+                        self.other += line
                         other = True
                     else:
                         raise LASError("Unknown section '%s'" % line)
@@ -347,6 +374,8 @@ class LASReader(object):
                                     self.wrap = True
                             if m.name == 'VERS':
                                 self.vers = m.data.strip()
+                            if m.name.strip() == 'DLM':
+                                self.dlm = delimiters[m.data.strip().upper()]
                         if current_section == self.well:
                             if m.name == 'NULL':
                                 self.null = float(m.data)
@@ -359,7 +388,11 @@ class LASReader(object):
                             elif m.name == 'STEP':
                                 self.step = float(m.data)
                                 self.step_units = m.units
+
             line = f.readline()
+
+        if re.search(r'\w', line) is None:
+            return
 
         # Finished reading the header--all that is left is the numerical
         # data that follows the '~A' line.  We'll construct a structured
@@ -371,7 +404,14 @@ class LASReader(object):
         if self.wrap:
             a = _read_wrapped_data(f, dt)
         else:
-            a = np.loadtxt(f, dtype=dt)
+            if self.dlm:
+                if self.dlm == ' ':
+                    dlm = None
+                else: 
+                    dlm = self.dlm
+                a = np.loadtxt(f, delimiter=dlm, dtype=dt)
+            else:
+                a = np.loadtxt(f, dtype=dt)
         self.data = a
 
         if opened_here:
@@ -381,9 +421,10 @@ class LASReader(object):
 if __name__ == "__main__":
     import sys
 
-    las = LASReader(sys.argv[1], null_subs=np.nan)
+    las = LASReader(sys.argv[1], null_subs=np.nan, unknown_as_other=False)
     print "wrap? ", las.wrap
     print "vers? ", las.vers
+    print "dlm? ", las.dlm
     print "null =", las.null
     print "start =", las.start
     print "stop  =", las.stop

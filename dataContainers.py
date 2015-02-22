@@ -12,11 +12,13 @@ from scipy.interpolate import griddata
 
 import rasterio
 from fiona import collection
-from shapely.geometry import shape, mapping, LineString
+from shapely.geometry import shape, mapping, LineString, Point
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
-from plot_lib import elevation_plot
+from plot_lib import elevation_plot, plot_striplog, composite_plot
+
+from lithology.lithology import intervals_from_las3_string
 
 import pyproj as pp
 
@@ -47,7 +49,9 @@ class transectContainer():
     """
     
     def __init__(self, transect_dir, seismic_dir,
-                 elevation_raster, las_dir, extents):
+                 elevation_raster, las_dir,
+                 bedrock_dir, striplog_dir,
+                 extents):
 
         self.extents = extents
 
@@ -55,6 +59,8 @@ class transectContainer():
         self.seismic = seismicContainer(seismic_dir)
         self.elevation = elevationContainer(elevation_raster)
         self.log = lasContainer(las_dir)
+        self.bedrock = bedrockContainer(bedrock_dir)
+        self.striplog = striplogContainer(striplog_dir)
 
         # Place holder for em/gravity etc...
         self.dummy = dummyContainer()
@@ -87,37 +93,45 @@ class transectContainer():
             self.extents[1] = transect.length
 
             # Make the figure and layout
-            fig = plt.figure()
+            fig = plt.figure(facecolor="w")
+            
             gs = gridspec.GridSpec(12, 12)
 
-            # Update the seismic data and plot
+            # update the containers
             self.seismic.update(transect)
-            fig.add_subplot(gs[2:10,4:])
+            self.log.update(transect)
+            self.elevation.update(transect)
+            self.bedrock.update(transect)
+            self.striplog.update(transect)
+            self.dummy.update(transect)
+            
+            # plot seismic
+            fig.add_subplot(gs[2:10,6:])
             self.seismic.plot(self.extents)
 
-            # Update the log data and plot
-            self.log.update(transect)
+            # plot logs
             fig.add_subplot(gs[2:10,6:])
             self.log.plot(self.extents,"GR")
 
-            # Do the composite/feature plot
-            fig.add_subplot(gs[2:12,0:3])
-            self.log.feature_plot()
-
-            # Update and plot the elevation
-            self.elevation.update(transect)
-            fig.add_subplot(gs[0:2,4:])
-            self.elevation.plot(self.extents)
+            # plot the elevation
+            fig.add_subplot(gs[0:2,6:])
+            self.elevation.plot(self.extents,
+                                self.bedrock)
 
             # Dummy plots are place holders for EM/Gravity/Attributes
-            self.dummy.update(transect)
-            fig.add_subplot(gs[10:11,4:])
+            
+            fig.add_subplot(gs[10:11,6:])
             self.dummy.plot(self.extents)
 
             self.dummy.update(transect)
-            fig.add_subplot(gs[11:,4:])
+            fig.add_subplot(gs[11:,6:])
             self.dummy.plot(self.extents)
+
+            # plot the composite
             
+            composite_plot(fig, gs, self.striplog.data[0],
+                           self.log.data[0], )
+
             plt.show()
  
 
@@ -313,7 +327,7 @@ class lasContainer():
             meta = self.lookup[point]
 
             name = meta["name"]
-            filename = os.path.join('data', 'wells', name,
+            filename = os.path.join('data', 'wells2', name,
                                     'wireline_log', name +
                                     '_out.LAS')
 
@@ -454,16 +468,17 @@ class elevationContainer():
             self.coords[i] = n
 
 
-    def plot(self, extents):
+    def plot(self, extents, bedrock):
         """
         Plots the elevation profile.
         @uses elevation_plot
 
+        @param bedrock: bedrockContainer object
         @param extents: Plot extents (x0,x1,z0,z1). Only x0 and x1
                         are used.
         """
         
-        elevation_plot(self.coords, self.data,
+        elevation_plot(self, bedrock,
                        [extents[0], extents[1]])
         
 
@@ -490,3 +505,95 @@ class dummyContainer():
 
         plt.axis('off')
     
+
+class bedrockContainer():
+
+
+    def __init__(self, bedrock_dir):
+
+        self.lookup = {}
+
+        self.data = []
+        self.coords = []
+
+        self.buffer = 1000 #[m]
+        
+        # Read in all shape files
+        for f in os.listdir(bedrock_dir):
+
+            if not f.endswith(".shp"):
+                continue
+            
+            for line in collection(os.path.join(bedrock_dir,f)):
+            
+                self.lookup[(shape(line['geometry']))] = \
+                            line['properties']
+
+
+        
+    def update(self, transect):
+
+
+        points = [Point(xy) for xy in transect.coords]
+
+        self.data = []
+        self.coords = []
+        
+        for polygon, properties in self.lookup.items():
+
+            for p in filter(polygon.contains, points):
+
+                self.data.append(properties)
+                self.coords.append(transect.project(p))
+
+
+        # sort the data to be in order
+        idx = sorted(range(len(self.coords)),
+                     key=lambda k: self.coords[k])
+
+        self.data = [self.data[i] for i in idx]
+        self.coords = np.array([self.coords[i] for i in idx])
+            
+                
+class striplogContainer(lasContainer):
+
+
+    def update(self, transect):
+
+        # Preprocess
+        prepared = prep(transect.buffer(self.buffer))
+
+        # Get the intersecting points
+        points = filter(prepared.contains, self.lookup.keys())
+
+        # reset the data
+        self.data = []
+        self.coords = []
+
+        for point in points:
+
+            meta = self.lookup[point]
+
+            name = meta["name"]
+            filename = os.path.join('data', 'wells', name,
+                                    'lithology_log', name +
+                                    '_striplog.las')
+
+            # Write out an error log?
+            if not os.path.exists(filename): continue
+
+            # store the transecting data
+            data = LASReader(filename, null_subs=np.nan,
+                             unknown_as_other=True)
+            
+            self.data.append(intervals_from_las3_string(data.other))
+            self.coords.append(transect.project(point))
+
+ 
+
+
+    def plot(self):
+
+        plot_striplog(self.data[0])
+
+        
