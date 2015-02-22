@@ -18,7 +18,7 @@ import StringIO
 import re 
 
 
-def elevation_plot(elevation, bedrock, xlim):
+def elevation_plot(elevation, bedrock, xlim, max_height):
 
 
     ele_x = elevation.coords
@@ -49,15 +49,19 @@ def elevation_plot(elevation, bedrock, xlim):
     bbox = {'fc':'w', 'pad':0, 'ec' :'none', 'alpha' : 0.5}  
     props = {'ha':'left', 'va':'center', 'fontsize': 6, 'bbox':bbox}
     
-    plt.ylim(0,3*np.amax(ele_y))  
+    plt.ylim((0,max_height))  
     plt.xlim(xlim)  
-    plt.yticks([])
+    plt.yticks([ int(max_height), int(np.amax(ele_y))])
     plt.xticks([])
+    
+    plt.gca().tick_params(axis='y', which='major', labelsize=8)
+    
     plt.gca().patch.set_alpha(0.1)
 
+    plt.ylabel("Elevation [m]", fontsize=8)
 
     plt.grid(True)
-    plt.text(0.0, 1.2*(np.ptp(ele_y)), "Surface Geology",
+    plt.text(0.0, .5*(max_height), "Surface Geology",
              props, rotation=0)
     plt.gca().set_frame_on(False)
 
@@ -154,23 +158,18 @@ def composite_plot(fig, gs,striplog, logs):
     RHOB = logs.data['RHOB']
     DRHO = logs.data['DRHO']
 
+    # Should be moved to params file
     log_dict = {
             'GR':GR, 
-            'DT':DT, 
-            'DPHI_SAN':DPHISS,
-            'NPHI_SAN':NPHISS,
-            'DTS':DTS, 
-            'RT_HRLT':RT_HRLT,
+            #'DT':DT, 
+            #'DPHI_SAN':DPHISS,
+            #'NPHI_SAN':NPHISS,
+            #'DTS':DTS, 
+            #'RT_HRLT':RT_HRLT,
             'RHOB':RHOB,
-            'DRHO':DRHO
+            #'DRHO':DRHO
             }
     
-    left  = 0.125  # the left side of the subplots of the figure
-    right = 0.9    # the right side of the subplots of the figure
-    bottom = 0.1   # the bottom of the subplots of the figure
-    top = 0.9      # the top of the subplots of the figure
-    wspace = 0.1   # the amount of width reserved for blank space between subplots
-    hspace = 0.5   # the amount of height reserved for white space between subplots
 
     window = 51 # window length for smoothing must be an odd integer
     frac = 0.05
@@ -180,7 +179,7 @@ def composite_plot(fig, gs,striplog, logs):
     has_striplog = True
     height = 2.5*ntracks  # in inches
     width = 1.5*ntracks # in inches
-    fs = 12  #font size for curve labels
+    fs = 8  #font size for curve labels
 
 
     naxes = 0
@@ -199,16 +198,14 @@ def composite_plot(fig, gs,striplog, logs):
     #fig.subplots_adjust(left, bottom, right, top, wspace, hspace)
     #fig.set_facecolor('w')
     
-    axss = plt.subplot(gs[2:12,0])
+    axss = plt.subplot(gs[0:12,0])
     axs0 = [axss, axss.twiny()]
-    axs1 = [plt.subplot(gs[2:12,1])]
-    axs2 = [plt.subplot(gs[2:12,2])]
-    axs3 = [plt.subplot(gs[2:12,3])]
-    axs4 = [plt.subplot(gs[2:12,4])]
+    axs1 = [plt.subplot(gs[0:12,1])]
 
-    axs = [axs0, axs1, axs2, axs3, axs4]
+    axs = [axs0, axs1]
 
-    plot_striplog(axs0[0], striplog,width = 5, alpha = 0.75,
+    plot_striplog(axs0[0], striplog,width = 5,
+                  alpha = 0.75,
                   ladder=True)
 
     axs0[0].set_ylim([striplog['bases'][-1], 0])
@@ -262,12 +259,12 @@ def composite_plot(fig, gs,striplog, logs):
 
         #fill_left
         if params['fill_left_cond']:
-            print params['fill_left_cond']
             if params['acronymn']=='GR':
                 # do the fill for the lithology track
                 axs[i][j].fill_betweenx(Z, params['xleft'], values,
-                                facecolor=params['fill_left'], alpha = 1.0, 
-                                zorder = 11)
+                                facecolor=params['fill_left'],
+                                alpha=1.0, 
+                                zorder=11)
 
             if params['acronymn']=='DPHI_SAN':
                 # do the fill for the neutron porosity track
@@ -310,8 +307,8 @@ def composite_plot(fig, gs,striplog, logs):
 
         # set scale of curve
         axs[i][j].set_xlim([params['xleft'],params['xright']])
-        print 'xticks', xticks
-        #print 'strings', sxticks
+     
+  
         axs[i][j].xaxis.set_ticks([xticks])
         axs[i][j].set_xticklabels([sxticks])
 
@@ -324,28 +321,30 @@ def composite_plot(fig, gs,striplog, logs):
         # if this is the first curve on the axis
 
         # curve label
-
-        trans = transforms.blended_transform_factory(axs[i][j].transData, axs[i][j].transData)
-        axs[i][j].text(xpos, -120 - 40*(label_shift[i] - 1), params['acronymn'],  
+        trans = \
+          transforms.blended_transform_factory(axs[i][j].transData,
+                                               axs[i][j].transData)
+        axs[i][j].text(xpos, -120 - 40*(label_shift[i] - 1),
+                       params['acronymn'],  
                        horizontalalignment='center',                    
                        verticalalignment='bottom',
-                       fontsize=12, color=params['hexcolor'],
+                       fontsize=8, color=params['hexcolor'],
                        transform=trans)
         # curve units
         if label_shift[i] <= 1:
             axs[i][j].text(xpos, -100, units,
                        horizontalalignment='center',
                        verticalalignment='top',
-                       fontsize=12, color='k',
+                       fontsize=8, color='k',
                        transform=trans)
 
         axs[i][j].set_xscale(linOrlog)
         axs[i][j].set_ylim([striplog['bases'][-1], 0]) 
 
-        axs[i][j].axes.xaxis.set_ticklabels(xticks)
+        axs[i][j].axes.xaxis.set_ticklabels([])
 
         axs[i][j].xaxis.tick_top()
-        axs[i][j].xaxis.set_label_position('top') 
+        axs[i][j].xaxis.set_label_position('bottom') 
 
         axs[i][j].xaxis.grid(True, which=whichticks,
                              linewidth=0.5, linestyle='-', 
@@ -355,7 +354,7 @@ def composite_plot(fig, gs,striplog, logs):
                              linewidth=0.5, linestyle='-',
                              color='0.85', zorder = 100)
 
-        axs[i][j].yaxis.set_ticks(np.arange(0,max(Z),100))
+        axs[i][j].yaxis.set_ticks(np.arange(0,max(Z),200))
         if i != 0:
             axs[i][j].set_yticklabels("")
 

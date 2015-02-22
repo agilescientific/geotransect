@@ -79,8 +79,6 @@ class transectContainer():
             
                 self.data.append(shape(line['geometry']))
 
-            
-        
 
     def plot(self):
         """
@@ -95,6 +93,7 @@ class transectContainer():
             # Make the figure and layout
             fig = plt.figure(facecolor="w")
             
+    
             gs = gridspec.GridSpec(12, 12)
 
             # update the containers
@@ -106,31 +105,31 @@ class transectContainer():
             self.dummy.update(transect)
             
             # plot seismic
-            fig.add_subplot(gs[2:10,6:])
+            fig.add_subplot(gs[1:9,3:])
             self.seismic.plot(self.extents)
 
+            seis_ticks = plt.xticks()
+
             # plot logs
-            fig.add_subplot(gs[2:10,6:])
+            fig.add_subplot(gs[1:9,3:])
             self.log.plot(self.extents,"GR")
 
             # plot the elevation
-            fig.add_subplot(gs[0:2,6:])
+            fig.add_subplot(gs[0:1,3:])
             self.elevation.plot(self.extents,
                                 self.bedrock)
 
             # Dummy plots are place holders for EM/Gravity/Attributes
-            
-            fig.add_subplot(gs[10:11,6:])
-            self.dummy.plot(self.extents)
+            fig.add_subplot(gs[10:,3:])
+            self.dummy.plot(self.extents, seis_ticks[0]*1000)
 
-            self.dummy.update(transect)
-            fig.add_subplot(gs[11:,6:])
-            self.dummy.plot(self.extents)
+            # plot the composite (hard coded log should come from
+            # configuration
+            feature_log = self.log.get("P-129")
+            feature_striplog = self.striplog.get("P-129")
+            composite_plot(fig, gs, feature_striplog,
+                           feature_log)
 
-            # plot the composite
-            
-            composite_plot(fig, gs, self.striplog.data[0],
-                           self.log.data[0], )
 
             plt.show()
  
@@ -185,22 +184,27 @@ class seismicContainer():
         for coords, data in zip(self.coords, self.data):
 
             z0 = 0
-            depth = 5000
+            depth = 2500
             plt.imshow(data,
-                       extent=[np.amin(coords),
-                               np.amax(coords),
+                       extent=[np.amin(coords) / 1000.0,
+                               np.amax(coords) / 1000.0,
                                depth, z0],
                                aspect="auto",
-                       cmap="Greys")
-            plt.axis(extents)
+                               cmap="Greys")
+            plot_axis = [extents[0]/1000., extents[1]/1000.,
+                         extents[2], extents[3]]
+            plt.axis(plot_axis)
 
         plt.ylabel("Depth [m]",fontsize = 8)
-        #plt.xlabel("Transect range [m]", fontsize = 8)
+        plt.xlabel("Transect range [km]", fontsize = 8)
 
         plt.tick_params(axis='y', which='major', labelsize=8)
         plt.tick_params(axis='y', which='minor', labelsize=8)
-        
-        plt.xticks(plt.xticks()[0],[])
+
+        plt.tick_params(axis='x', which='major', labelsize=8)
+        plt.tick_params(axis='x', which='minor', labelsize=8)
+
+        plt.grid(True)
 
     
                     
@@ -284,7 +288,8 @@ class lasContainer():
         self.data = []     # plot data
         self.coords = []   # transect coords of plot data
         self.buffer = 300  # [m] buffer for transect association
-
+        self.log_lookup  ={} # look up for log ids
+        
         for root, dirs, files in os.walk(las_dir):
 
             try:
@@ -321,13 +326,14 @@ class lasContainer():
         # reset the data
         self.data = []
         self.coords = []
+        self.log_lookup = {}
 
         for point in points:
 
             meta = self.lookup[point]
 
             name = meta["name"]
-            filename = os.path.join('data', 'wells2', name,
+            filename = os.path.join('data', 'wells', name,
                                     'wireline_log', name +
                                     '_out.LAS')
 
@@ -337,8 +343,17 @@ class lasContainer():
             # store the transecting data
             self.data.append(LASReader(filename, null_subs=np.nan))
             self.coords.append(transect.project(point))
+            self.log_lookup[name] = self.data[-1]
 
-            
+
+    def get(self, log_id):
+        """
+        Returns data corresponding to log_id
+        """
+
+        return self.log_lookup.get(log_id)
+
+        
     def plot(self, extents, log):
         """
         Plots the log data.
@@ -360,7 +375,8 @@ class lasContainer():
             # scale position
             data *= .1*(extents[1] - extents[0])
             data += pos
-        
+
+            
             plt.plot(data, las.data['DEPT'],
                      'g', lw = 0.5, alpha = 0.5)
         
@@ -369,19 +385,7 @@ class lasContainer():
         
             plt.axis("off")
         plt.axis('off')
-            
-
-    def feature_plot(self):
-        """
-        Creates an elaborate composite well log plot
-        """
-
-        if self.data:
-            plt.plot(self.data[0].data['GR'],
-                     self.data[0].data['DEPT'])
         
-        
-
 class elevationContainer():
     """
     Container for managing and plotting elevation data.
@@ -479,7 +483,8 @@ class elevationContainer():
         """
         
         elevation_plot(self, bedrock,
-                       [extents[0], extents[1]])
+                       [extents[0], extents[1]],
+                       np.amax(self.elevation_profile))
         
 
 class dummyContainer():
@@ -497,15 +502,20 @@ class dummyContainer():
         self.coords = np.linspace(0, transect.length, 1000)
         self.data = np.random.randn(self.coords.size)
 
-    def plot(self, extents):
+    def plot(self, extents, xticks):
 
         plt.plot(self.coords, self.data)
+        plt.yticks([-4,0,4])
+                   
+        plt.xticks(xticks, [])
 
+        plt.ylabel("Anomaly [mGal]", fontsize=8)
+        plt.tick_params(axis='y', which="major", labelsize=8)
+
+        plt.grid(True)
         plt.xlim((extents[0], extents[1]))
-
-        plt.axis('off')
-    
-
+        plt.ylim((-4,4))
+        
 class bedrockContainer():
 
 
@@ -569,6 +579,7 @@ class striplogContainer(lasContainer):
         # reset the data
         self.data = []
         self.coords = []
+        self.log_lookup = {}
 
         for point in points:
 
@@ -588,12 +599,12 @@ class striplogContainer(lasContainer):
             
             self.data.append(intervals_from_las3_string(data.other))
             self.coords.append(transect.project(point))
-
+            self.log_lookup[name] = self.data[-1]
  
 
 
     def plot(self):
 
-        plot_striplog(self.data[0])
+        plot_striplog(self.data)
 
         

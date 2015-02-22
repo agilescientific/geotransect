@@ -7,10 +7,10 @@ seismic_dir = 'data/seismic/'
 las_shape = 'data/wells'
 elevation_file = 'data/elevation_raster/NS_DEM_ascii.asc'
 bedrock_dir = 'data/bedrock_shapefile'
-striplog_dir = 'data/wells2'
+striplog_dir = 'data/wells'
 
 
-extents = [0,40000, 6000,0]
+extents = [0,40000, 2500,0]
 
 # Initial the main object
 tc = transectContainer(transect_file, seismic_dir, elevation_file,
