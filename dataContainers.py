@@ -16,8 +16,7 @@ from shapely.geometry import shape, mapping, LineString, Point
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
-from plot_lib import elevation_plot, plot_striplog, composite_plot
-
+from plot_lib import uberPlot
 from lithology.lithology import intervals_from_las3_string
 
 import pyproj as pp
@@ -90,12 +89,6 @@ class transectContainer():
             # Set the extent to the length? Or keep them all the same?
             self.extents[1] = transect.length
 
-            # Make the figure and layout
-            fig = plt.figure(facecolor="w")
-            
-    
-            gs = gridspec.GridSpec(12, 12)
-
             # update the containers
             self.seismic.update(transect)
             self.log.update(transect)
@@ -103,37 +96,12 @@ class transectContainer():
             self.bedrock.update(transect)
             self.striplog.update(transect)
             self.dummy.update(transect)
-            
-            # plot seismic
-            fig.add_subplot(gs[1:9,3:])
-            self.seismic.plot(self.extents)
 
-            seis_ticks = plt.xticks()
-
-            # plot logs
-            fig.add_subplot(gs[1:9,3:])
-            self.log.plot(self.extents,"GR")
-
-            # plot the elevation
-            fig.add_subplot(gs[0:1,3:])
-            self.elevation.plot(self.extents,
-                                self.bedrock)
-
-            # Dummy plots are place holders for EM/Gravity/Attributes
-            fig.add_subplot(gs[10:,3:])
-            self.dummy.plot(self.extents, seis_ticks[0]*1000)
-
-            # plot the composite (hard coded log should come from
-            # configuration
-            feature_log = self.log.get("P-129")
-            feature_striplog = self.striplog.get("P-129")
-            composite_plot(fig, gs, feature_striplog,
-                           feature_log)
-
-
+            uberPlot(transect, self.seismic, self.elevation,
+                     self.log, self.bedrock,
+                     self.striplog, self.dummy,
+                     self.extents)
             plt.show()
- 
-
     
 class seismicContainer():
     """
@@ -170,42 +138,6 @@ class seismicContainer():
                     # (segyfile, trace)
                     self.lookup[shape(trace["geometry"])] =\
                                 trace["properties"]
-
-                                
-    def plot(self, extents):
-        """
-        Plots a seismic section.
-
-        @param extents: The range and depth extents of the axes.
-                        (x0,x1,z0,z1)
-        """
-
-        # Loop through each seismic line
-        for coords, data in zip(self.coords, self.data):
-
-            z0 = 0
-            depth = 2500
-            plt.imshow(data,
-                       extent=[np.amin(coords) / 1000.0,
-                               np.amax(coords) / 1000.0,
-                               depth, z0],
-                               aspect="auto",
-                               cmap="Greys")
-            plot_axis = [extents[0]/1000., extents[1]/1000.,
-                         extents[2], extents[3]]
-            plt.axis(plot_axis)
-
-        plt.ylabel("Depth [m]",fontsize = 8)
-        plt.xlabel("Transect range [km]", fontsize = 8)
-
-        plt.tick_params(axis='y', which='major', labelsize=8)
-        plt.tick_params(axis='y', which='minor', labelsize=8)
-
-        plt.tick_params(axis='x', which='major', labelsize=8)
-        plt.tick_params(axis='x', which='minor', labelsize=8)
-
-        plt.grid(True)
-
     
                     
     def update(self, transect):
@@ -353,38 +285,8 @@ class lasContainer():
 
         return self.log_lookup.get(log_id)
 
+
         
-    def plot(self, extents, log):
-        """
-        Plots the log data.
-
-        @param extents: The range and depth extents of the axes.
-                        (x0,x1,z0,z1)
-
-        @param log: Name of the curve to plot. (maybe this should be
-                    an object property?)
-        """
-
-        for las, pos in zip(self.data, self.coords):
-
-            data = np.nan_to_num(las.data[log])
-
-            # normalize
-            data /= np.amax(data)
-
-            # scale position
-            data *= .1*(extents[1] - extents[0])
-            data += pos
-
-            
-            plt.plot(data, las.data['DEPT'],
-                     'g', lw = 0.5, alpha = 0.5)
-        
-            plt.xlim((extents[0], extents[1]))
-            plt.ylim((extents[2], extents[3]))
-        
-            plt.axis("off")
-        plt.axis('off')
         
 class elevationContainer():
     """

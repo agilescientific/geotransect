@@ -22,3 +22,4 @@ tc = transectContainer(transect_file, seismic_dir, elevation_file,
 # Make the plots
 tc.plot()
 
+

@@ -11,60 +11,18 @@ import matplotlib.transforms as transforms
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 
+from matplotlib import pyplot as plt, gridspec
+
 from lithology.legends import legend
 
 import csv
 import StringIO
-import re 
+import re
+
+from PIL import Image
 
 
-def elevation_plot(elevation, bedrock, xlim, max_height):
-
-
-    ele_x = elevation.coords
-    ele_y = elevation.data
-
-    bed_x = bedrock.coords
-
-    # Could be done with LineCollection?
-    for i, geo in enumerate(bedrock.data[:-1]):
-
-        lim1 = bed_x[i]
-        lim2 = bed_x[i+1]
-
-        idx = np.where(np.logical_and(ele_x >= lim1,
-                                      ele_x <= lim2))[0] # list 
-
-        if idx[-1] < ele_x.size-1:
-            idx = np.append(idx, (idx[-1] + 1))
-
-        hsv = np.array([[geo["AV_HUE"],geo["AV_SAT"],
-                         geo["AV_VAL"]]]).reshape(1,1,3)
-        
-        color = hsv_to_rgb(hsv/255.)
-        plt.plot(ele_x[idx], ele_y[idx], linewidth=3,
-                 color=color.flatten())
-        
-
-    bbox = {'fc':'w', 'pad':0, 'ec' :'none', 'alpha' : 0.5}  
-    props = {'ha':'left', 'va':'center', 'fontsize': 6, 'bbox':bbox}
-    
-    plt.ylim((0,max_height))  
-    plt.xlim(xlim)  
-    plt.yticks([ int(max_height), int(np.amax(ele_y))])
-    plt.xticks([])
-    
-    plt.gca().tick_params(axis='y', which='major', labelsize=8)
-    
-    plt.gca().patch.set_alpha(0.1)
-
-    plt.ylabel("Elevation [m]", fontsize=8)
-
-    plt.grid(True)
-    plt.text(0.0, .5*(max_height), "Surface Geology",
-             props, rotation=0)
-    plt.gca().set_frame_on(False)
-
+   
 
 
 def plot_striplog(ax, striplog, width=1,
@@ -142,11 +100,227 @@ def despike(curve, curve_sm, max_clip):
     return out
 
 
-def composite_plot(fig, gs,striplog, logs):
 
+
+def uberPlot(transect, seismic_container, elevation_container,
+             log_container, bedrock_container, striplog_container,
+             em_container, extents):
+
+    # -------------------------------------------------#
+    # get the data from the containers
+    #--------------------------------------------------#
+    transectx, transecty = transect.coords.xy
+
+    seismic_data = seismic_container.data # list of 2D arrays
+    seismic_x = seismic_container.coords # list of 1D arrays Range along transect
+
+    elevation_data = elevation_container.data # 1D array
+    elevation_x = elevation_container.coords # Range along transect
+    max_height = np.amax(elevation_container.elevation_profile)
+
+    log_data = log_container.data # List of LASReader objs
+    log_x = log_container.coords # List of locations for each log
+
+    bedrock_data = bedrock_container.data # List of dictionaries
+    bedrock_x = bedrock_container.coords # Range along transect
+
+    striplog_data = striplog_container.data # List of dicts
+    striplog_x = striplog_container.coords # Range along transect
+    striplog = striplog_container.get("P-129")
+    
+    em_data = em_container.data
+    em_x = em_container.coords
+
+    #------------------------------------------------------------#
+    # Figure Layout
+    #------------------------------------------------------------#
+    
+    gs = gridspec.GridSpec(12, 15)
+    fig = plt.figure(facecolor = 'w', # TODO set fig size
+                     edgecolor='k',
+                     dpi=None,  
+                     frameon=True)
+
+    header = fig.add_subplot(gs[0:2,0:10])
+    description = fig.add_subplot(gs[2:5,0:4])
+    large_scale = fig.add_subplot(gs[2:5,4:7])
+    small_scale = fig.add_subplot(gs[2:5,7:10])
+
+    #featured = fig.add_subplot(gs[0:-1, 10:])
+    ns_label = fig.add_subplot(gs[-1:, 10:])
+
+    elevation = fig.add_subplot(gs[5,:10])
+
+    xsection = fig.add_subplot(gs[6:11, :10])
+    log = fig.add_subplot(gs[6:11, :10])
+
+    em = fig.add_subplot(gs[11:, :10])
+
+    
+    #------------------------------------------------------------#
+    # Plot the seismic cross section
+    #------------------------------------------------------------#
+    
+        
+    # Loop through each seismic line
+    for coords, data in zip(seismic_x, seismic_data):
+
+        z0 = 0
+        depth = 2500
+        xsection.imshow(data,
+                        extent=[np.amin(coords) / 1000.0,
+                                np.amax(coords) / 1000.0,
+                                depth, z0],
+                        aspect="auto", cmap="Greys")
+        
+        plot_axis = [extents[0]/1000., extents[1]/1000.,
+                      extents[2], extents[3]]
+        xsection.axis(plot_axis)
+
+    xsection.set_ylabel("Depth [m]",fontsize = 8)
+    xsection.set_xlabel("Transect range [km]", fontsize = 8)
+
+    xsection.tick_params(axis='y', which='major', labelsize=8)
+    xsection.tick_params(axis='y', which='minor', labelsize=8)
+
+    xsection.tick_params(axis='x', which='major', labelsize=8)
+    xsection.tick_params(axis='x', which='minor', labelsize=8)
+
+    xsection.grid(True)
+
+
+    #--------------------------------------------------------#
+    # Plot the log overlays
+    #--------------------------------------------------------#
+    for las, pos in zip(log_data, log_x):
+
+        data = np.nan_to_num(las.data["GR"])
+
+        # normalize
+        data /= np.amax(data)
+
+        # scale position
+        data *= .1*(extents[1] - extents[0])
+        data += pos
+
+        log.plot(data, las.data['DEPT'],
+                 'g', lw = 0.5, alpha = 0.5)
+        
+        log.set_xlim((extents[0], extents[1]))
+        log.set_ylim((extents[2], extents[3]))
+        
+        log.axis("off")
+        
+    log.axis('off')
+
+    # TODO WELL LOG LABELS
+    
+
+    # ----------------------------------------------------------#
+    # Elevation and bedrock plot
+    #-----------------------------------------------------------#
+    # Could be done with LineCollection?
+    for i, geo in enumerate(bedrock_data[:-1]):
+
+        lim1 = bedrock_x[i]
+        lim2 = bedrock_x[i+1]
+
+        idx = np.where(np.logical_and(elevation_x >= lim1,
+                                      elevation_x <= lim2))[0] # list 
+
+        if idx[-1] < elevation_x.size-1:
+            idx = np.append(idx, (idx[-1] + 1))
+
+        hsv = np.array([[geo["AV_HUE"],geo["AV_SAT"],
+                         geo["AV_VAL"]]]).reshape(1,1,3)
+        
+        color = hsv_to_rgb(hsv/255.)
+        elevation.plot(elevation_x[idx], elevation_data[idx],
+                       linewidth=3, color=color.flatten())
+        
+
+    bbox = {'fc':'w', 'pad':0, 'ec' :'none', 'alpha' : 0.5}  
+    props = {'ha':'left', 'va':'center', 'fontsize': 6, 'bbox':bbox}
+    
+    elevation.set_ylim((max_height,0))  
+    elevation.set_xlim(extents[:2])  
+    elevation.set_yticks([0, int(max_height),
+                          int(np.amax(elevation_data))])
+    elevation.set_xticks([])
+    
+    elevation.tick_params(axis='y', which='major', labelsize=8)
+    
+    elevation.patch.set_alpha(0.1)
+
+    elevation.set_ylabel("Elevation [m]", fontsize=8)
+
+    elevation.grid(True)
+    elevation.text(0.0, .5*(max_height), "Surface Geology",
+             props, rotation=0)
+    elevation.set_frame_on(False)
+
+    #---------------------------------------------------------#
+    # Header
+    #---------------------------------------------------------#
+    
+    header.axis("off")
+
+    props["fontsize"]=20
+    header.text(0.0, 0.0, "Transect Title", props)
+
+    # TODO Underline/format
+
+    #-----------------------------------------------------#
+    # Description
+    #-----------------------------------------------------#
+    props["fontsize"]=8
+    description.text(0.0,0.0,
+                     ("Lorem ipsum dolor sit amet, consectetur \n" +
+                      "adipiscing elit, sed do eiusmod tempor \n" +
+                      "incididunt ut labore et dolore magna aliqua. \n" +
+                      "Ut enim ad minim veniam, quis nostrud \n" +
+                      "exercitation ullamco laboris nisi ut aliquip \n"+
+                      "ex ea commodo consequat. Duis aute irure \n"))
+    description.axis('off')
+
+    # TODO figure out how to get a description
+
+    # --------------------------------------------------------#
+    # Large scale map
+    #---------------------------------------------------------#
+    large_scale.plot(transectx, transecty)
+    large_scale.patch.set_facecolor("0.75")
+    large_scale.set_xticks([])
+    large_scale.set_yticks([])
+
+    #large_scale.axis("off")
+
+    # --------------------------------------------------------#
+    # Small scale map
+    #---------------------------------------------------------#
+    small_scale.plot(transectx, transecty)
+    small_scale.patch.set_facecolor("0.75") 
+    #small_scale.axis("off")
+    small_scale.set_xticks([])
+    small_scale.set_yticks([])
+
+
+    #-----------------------------------------------------------#
+    # Em data
+    #-----------------------------------------------------------#
+
+    em.plot(em_x, em_data)
+    em.axis("off")
+
+    # TODO
+
+    #-----------------------------------------------------#
+    #      Feature Plot - Oh Baby
+    #-----------------------------------------------------#
     fname = 'templates/Petrophysics_display_template.csv'
     params = get_curve_params('RT_HRLT', fname)
 
+    logs = log_container.get("P-129")
 
     Z = logs.data['DEPT']
     GR = logs.data['GR']
@@ -158,18 +332,23 @@ def composite_plot(fig, gs,striplog, logs):
     RHOB = logs.data['RHOB']
     DRHO = logs.data['DRHO']
 
-    # Should be moved to params file
     log_dict = {
             'GR':GR, 
-            #'DT':DT, 
-            #'DPHI_SAN':DPHISS,
-            #'NPHI_SAN':NPHISS,
-            #'DTS':DTS, 
-            #'RT_HRLT':RT_HRLT,
+            'DT':DT, 
+            'DPHI_SAN':DPHISS,
+            'NPHI_SAN':NPHISS,
+            'DTS':DTS, 
+            'RT_HRLT':RT_HRLT,
             'RHOB':RHOB,
-            #'DRHO':DRHO
+            'DRHO':DRHO
             }
     
+    left  = 0.125  # the left side of the subplots of the figure
+    right = 0.9    # the right side of the subplots of the figure
+    bottom = 0.1   # the bottom of the subplots of the figure
+    top = 0.9      # the top of the subplots of the figure
+    wspace = 0.1   # the amount of width reserved for blank space between subplots
+    hspace = 0.5   # the amount of height reserved for white space between subplots
 
     window = 51 # window length for smoothing must be an odd integer
     frac = 0.05
@@ -179,7 +358,7 @@ def composite_plot(fig, gs,striplog, logs):
     has_striplog = True
     height = 2.5*ntracks  # in inches
     width = 1.5*ntracks # in inches
-    fs = 8  #font size for curve labels
+    fs = 12  #font size for curve labels
 
 
     naxes = 0
@@ -198,14 +377,16 @@ def composite_plot(fig, gs,striplog, logs):
     #fig.subplots_adjust(left, bottom, right, top, wspace, hspace)
     #fig.set_facecolor('w')
     
-    axss = plt.subplot(gs[0:12,0])
+    axss = plt.subplot(gs[0:-1,10])
     axs0 = [axss, axss.twiny()]
-    axs1 = [plt.subplot(gs[0:12,1])]
+    axs1 = [plt.subplot(gs[0:-1,11])]
+    axs2 = [plt.subplot(gs[0:-1,12])]
+    axs3 = [plt.subplot(gs[0:-1,13])]
+    axs4 = [plt.subplot(gs[0:-1,14])]
 
-    axs = [axs0, axs1]
+    axs = [axs0, axs1, axs2, axs3, axs4]
 
-    plot_striplog(axs0[0], striplog,width = 5,
-                  alpha = 0.75,
+    plot_striplog(axs0[0], striplog, width = 5, alpha = 0.75,
                   ladder=True)
 
     axs0[0].set_ylim([striplog['bases'][-1], 0])
@@ -259,12 +440,12 @@ def composite_plot(fig, gs,striplog, logs):
 
         #fill_left
         if params['fill_left_cond']:
+            print params['fill_left_cond']
             if params['acronymn']=='GR':
                 # do the fill for the lithology track
                 axs[i][j].fill_betweenx(Z, params['xleft'], values,
-                                facecolor=params['fill_left'],
-                                alpha=1.0, 
-                                zorder=11)
+                                facecolor=params['fill_left'], alpha = 1.0, 
+                                zorder = 11)
 
             if params['acronymn']=='DPHI_SAN':
                 # do the fill for the neutron porosity track
@@ -307,8 +488,8 @@ def composite_plot(fig, gs,striplog, logs):
 
         # set scale of curve
         axs[i][j].set_xlim([params['xleft'],params['xright']])
-     
-  
+        print 'xticks', xticks
+        #print 'strings', sxticks
         axs[i][j].xaxis.set_ticks([xticks])
         axs[i][j].set_xticklabels([sxticks])
 
@@ -321,30 +502,28 @@ def composite_plot(fig, gs,striplog, logs):
         # if this is the first curve on the axis
 
         # curve label
-        trans = \
-          transforms.blended_transform_factory(axs[i][j].transData,
-                                               axs[i][j].transData)
-        axs[i][j].text(xpos, -120 - 40*(label_shift[i] - 1),
-                       params['acronymn'],  
+
+        trans = transforms.blended_transform_factory(axs[i][j].transData, axs[i][j].transData)
+        axs[i][j].text(xpos, -120 - 40*(label_shift[i] - 1), params['acronymn'],  
                        horizontalalignment='center',                    
                        verticalalignment='bottom',
-                       fontsize=8, color=params['hexcolor'],
+                       fontsize=12, color=params['hexcolor'],
                        transform=trans)
         # curve units
         if label_shift[i] <= 1:
             axs[i][j].text(xpos, -100, units,
                        horizontalalignment='center',
                        verticalalignment='top',
-                       fontsize=8, color='k',
+                       fontsize=12, color='k',
                        transform=trans)
 
         axs[i][j].set_xscale(linOrlog)
         axs[i][j].set_ylim([striplog['bases'][-1], 0]) 
 
-        axs[i][j].axes.xaxis.set_ticklabels([])
+        axs[i][j].axes.xaxis.set_ticklabels(xticks)
 
         axs[i][j].xaxis.tick_top()
-        axs[i][j].xaxis.set_label_position('bottom') 
+        axs[i][j].xaxis.set_label_position('top') 
 
         axs[i][j].xaxis.grid(True, which=whichticks,
                              linewidth=0.5, linestyle='-', 
@@ -354,7 +533,7 @@ def composite_plot(fig, gs,striplog, logs):
                              linewidth=0.5, linestyle='-',
                              color='0.85', zorder = 100)
 
-        axs[i][j].yaxis.set_ticks(np.arange(0,max(Z),200))
+        axs[i][j].yaxis.set_ticks(np.arange(0,max(Z),100))
         if i != 0:
             axs[i][j].set_yticklabels("")
 
@@ -369,4 +548,19 @@ def composite_plot(fig, gs,striplog, logs):
     for label in axs[0][0].axes.yaxis.get_ticklabels():
             label.set_rotation(90)
             label.set_fontsize(10)
-    
+
+
+    #--------------------------------------------------------------#
+    # LOGO
+    #--------------------------------------------------------------#
+
+    img = Image.open("logo.png")
+    arr = np.array(img)
+
+    #Broken
+    #ns_label.imshow(arr, aspect="auto")
+    #ns_label.axis('off')
+
+    ns_label.text(0.0,0.0, "NS ENERGY LABEL")
+    ns_label.axis("off")
+    fig.tight_layout()
