@@ -128,12 +128,14 @@ class seismicContainer():
         
         for f in fnmatch.filter(os.listdir(seis_dir), '*.shp'):
 
+            print("Found shape files for seismic")
             shapefile = os.path.join(seis_dir, f)
         
             with collection(shapefile, "r") as traces:
 
                 for trace in traces:
 
+                    print("Found seismic trace locations")
                     # Map a point object to trace properties
                     # (segyfile, trace)
                     self.lookup[shape(trace["geometry"])] =\
@@ -163,6 +165,7 @@ class seismicContainer():
         file_lookup = {}
         for point in points:
 
+            print("updating seismic transect")
             meta = self.lookup[point]
       
             if(meta["segyfile"] in file_lookup):
@@ -192,6 +195,7 @@ class seismicContainer():
             traces = file_lookup[segyfile]["trace"]
             coords = file_lookup[segyfile]["pos"]
 
+            print("Read in seismic data")
             # sort the traces to be in order
             idx = sorted(range(len(traces)), key=lambda k: traces[k])
             
