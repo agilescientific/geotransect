@@ -126,7 +126,7 @@ class seismicContainer():
         self.buffer = 300.0 # [m] of buffer for transect association
 
         
-        for f in fnmatch.filter(os.listdir(seis_dir), '.*.shp'):
+        for f in fnmatch.filter(os.listdir(seis_dir), '*.shp'):
 
             shapefile = os.path.join(seis_dir, f)
         

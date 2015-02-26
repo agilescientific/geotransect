@@ -3,7 +3,7 @@ import sys
 
 ## These will be read from a config file .... ##
 transect_file = 'data/transect_shp'
-seismic_dir = 'data/seismic/'
+seismic_dir = 'data/seis_ev/'
 las_shape = 'data/wells'
 elevation_file = 'data/elevation_raster/NS_DEM_ascii.asc'
 bedrock_dir = 'data/bedrock_shapefile'
