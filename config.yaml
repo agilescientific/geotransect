@@ -1,0 +1,23 @@
+# -*- coding: utf-8 -*-
+# config.yaml
+# Configuration file for geoTransect.py
+
+params:
+    name: Test 
+    id: 1
+    description: This transect is the one we are using to test this module.
+    extents:
+        - 0
+        - 40000
+        - 2500
+        - 0
+    buffer: 3000
+    data_dir: /Users/matt/Dropbox/geotransect_test/data
+
+data:
+    transect_file: transects2Deliver/Transects.shp
+    seismic_dir: seismic
+    well_dir: wells
+    elevation_file: elevation_raster/NS_DEM_ascii.asc
+    bedrock_dir: bedrock
+    striplog_dir: wells

@@ -1,25 +1,50 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Master script to build transects.
+
+Put configuration in config.yaml or pass the config file on
+the command line.
+
+:copyright: 2015 Agile Geoscience
+:license: Apache 2.0
+"""
+
+import argparse
+import os
+
+import yaml
+
 from dataContainers import transectContainer
-import sys
-
-## These will be read from a config file .... ##
-transect_file = 'data/transect_shp'
-seismic_dir = 'data/seis_ev/'
-las_shape = 'data/wells'
-elevation_file = 'data/elevation_raster/NS_DEM_ascii.asc'
-bedrock_dir = 'data/bedrock_shapefile'
-striplog_dir = 'data/wells'
 
 
-extents = [0,40000, 2500,0]
+def main(cfg):
 
-# Initial the main object
-tc = transectContainer(transect_file, seismic_dir, elevation_file,
-                       las_shape, bedrock_dir,
-                       striplog_dir,extents)
+    # Initialize the main object
+    params = cfg['params']
+    data = cfg['data']
 
-
-
-# Make the plots
-tc.plot()
+    root = cfg['params']['data_dir']
+    for k, v in data.items():
+        data[k] = os.path.join(root, v)
 
 
+    # Initialize the main object
+    tc = transectContainer(params, data)
+
+    # Make the plots
+    tc.plot()
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config",
+                        type=argparse.FileType('r'),
+                        help="The name of a YAML config file.")
+    c = parser.parse_args(['--config', 'config.yaml'])
+
+    with c.config as ymlfile:
+        config = yaml.load(ymlfile)
+
+    main(config)

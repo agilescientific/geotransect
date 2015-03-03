@@ -1,37 +1,22 @@
 import numpy as np
 
-from matplotlib.collections import LineCollection
-from matplotlib.colors import ListedColormap, BoundaryNorm
+import matplotlib.pyplot as plt
 
-from matplotlib import pyplot as plt
-
-from matplotlib.colors import hsv_to_rgb, hex2color
+from matplotlib.colors import hsv_to_rgb
 
 import matplotlib.transforms as transforms
-import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
-
-from matplotlib import pyplot as plt, gridspec
 
 from lithology.legends import legend
 
 import csv
-import StringIO
-import re
 
 from PIL import Image
 
-def float_formatter(x):
-    """
-    two decimal places of precision for a floating pt number
-    """
-    x = float(x)
-    return lambda x: "%.2f" % x
 
 def get_tops(fname):
     """
-    takes a tops_dictionary for plotting
-    the all petrophysical tracks and wells
+    Takes a tops_dictionary for plotting in the logs tracks.
     """
     tops = {}
     with open(fname) as f:
@@ -43,7 +28,7 @@ def get_tops(fname):
 
 
 def plot_striplog(ax, striplog, width=1,
-                  ladder=False, summaries=False, minthick=1,
+                  ladder=False, minthick=1,
                   alpha=0.75):
 
     for t, b, l in zip(striplog['tops'], striplog['bases'],
@@ -63,11 +48,6 @@ def plot_striplog(ax, striplog, width=1,
                          linewidth=1.0, alpha=alpha)
         ax.add_patch(rect)
 
-        if summaries:
-            if thick >= minthick:
-                ax.text(6, t + thick / 2, summarize(l),
-                        verticalalignment='center')
-
         ax.set_ylim([striplog['bases'][-1], 0])
 
 
@@ -78,7 +58,7 @@ def get_curve_params(abbrev, fname):
     """
     params = {}
     with open(fname, 'rU') as csvfile:
-        reader = csv.DictReader(csvfile) 
+        reader = csv.DictReader(csvfile)
         for row in reader:
             if row['acronymn'] == abbrev:
                 params['acronymn'] = row['acronymn']
@@ -97,6 +77,9 @@ def get_curve_params(abbrev, fname):
 
 
 def rolling_window(a, window):
+    """
+    Apply a moving mdeian filter.
+    """
     shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
     strides = a.strides + (a.strides[-1],)
     rolled = np.lib.stride_tricks.as_strided(a,
@@ -106,7 +89,11 @@ def rolling_window(a, window):
     rolled = np.pad(rolled, window / 2, mode='edge')
     return rolled
 
+
 def despike(curve, curve_sm, max_clip):
+    """
+    Remove spikes from a curve.
+    """
     spikes = np.where(curve - curve_sm > max_clip)[0]
     spukes = np.where(curve_sm - curve > max_clip)[0]
     out = np.copy(curve)
@@ -115,11 +102,11 @@ def despike(curve, curve_sm, max_clip):
     return out
 
 
-
-
 def uberPlot(transect, seismic_container, elevation_container,
              log_container, bedrock_container, striplog_container,
              em_container, extents):
+
+    # Lasciate ogni speranza, voi ch'entrate.
 
     # -------------------------------------------------#
     # get the data from the containers
@@ -127,7 +114,7 @@ def uberPlot(transect, seismic_container, elevation_container,
     transectx, transecty = transect.coords.xy
 
     seismic_data = seismic_container.data  # list of 2D arrays
-    seismic_x = seismic_container.coords  # list of 1D arrays Range along transect
+    seismic_x = seismic_container.coords  # list of 1D arrs. Range along transect
 
     elevation_data = elevation_container.data  # 1D array
     elevation_x = elevation_container.coords  # Range along transect
@@ -242,8 +229,6 @@ def uberPlot(transect, seismic_container, elevation_container,
 
     log.axis('off')
 
-    # TODO WELL LOG LABELS
-
     # ----------------------------------------------------------#
     # Elevation and bedrock plot
     # -----------------------------------------------------------#
@@ -289,7 +274,6 @@ def uberPlot(transect, seismic_container, elevation_container,
     # ---------------------------------------------------------#
     # Header
     # ---------------------------------------------------------#
-
     header.axis("off")
     props["fontsize"] = 30
     dy = 0.2
@@ -315,17 +299,12 @@ def uberPlot(transect, seismic_container, elevation_container,
                 verticalalignment='bottom')
 
     # -----------------------------------------------------#
-    # Paragraph Description
+    # Paragraph description
     # -----------------------------------------------------#
     for i in [0.0, 0.5]:
         # put the paragraph in twice (2 columns)
         description.text(i, 1.0,
-                         ("Lorem ipsum dolor sit amet, consectetur \n" +
-                          "adipiscing elit, sed do eiusmod tempor \n" +
-                          "incididunt ut labore et dolore magna aliqua. \n" +
-                          "Ut enim ad minim veniam, quis nostrud \n" +
-                          "exercitation ullamco laboris nisi ut aliquip \n" +
-                          "ex ea commodo consequat. Duis aute irure \n"),
+                         text,
                          horizontalalignment='left',
                          verticalalignment='top',
                          fontsize=12
