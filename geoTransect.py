@@ -15,12 +15,13 @@ import os
 
 import yaml
 
-from dataContainers import transectContainer
+from dataContainers import TransectContainer
 
 
 def main(cfg):
 
-    # Initialize the main object
+    print "Initializing"
+
     params = cfg['params']
     data = cfg['data']
 
@@ -28,11 +29,10 @@ def main(cfg):
     for k, v in data.items():
         data[k] = os.path.join(root, v)
 
-
-    # Initialize the main object
-    tc = transectContainer(params, data)
+    tc = TransectContainer(params, data)
 
     # Make the plots
+    print "Plotting"
     tc.plot()
 
 

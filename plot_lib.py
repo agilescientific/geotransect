@@ -1,17 +1,23 @@
-import numpy as np
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Functions for plotting.
 
-import matplotlib.pyplot as plt
-
-from matplotlib.colors import hsv_to_rgb
-
-import matplotlib.transforms as transforms
-from matplotlib.patches import Rectangle
-
-from lithology.legends import legend
-
+:copyright: 2015 Agile Geoscience
+:license: Apache 2.0
+"""
 import csv
+import os
 
 from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import hsv_to_rgb
+import matplotlib.transforms as transforms
+from matplotlib.patches import Rectangle
+from matplotlib import gridspec
+
+from lithology.legends import legend
 
 
 def get_tops(fname):
@@ -31,24 +37,25 @@ def plot_striplog(ax, striplog, width=1,
                   ladder=False, minthick=1,
                   alpha=0.75):
 
-    for t, b, l in zip(striplog['tops'], striplog['bases'],
-                       striplog['liths']):
+    pass
+    # for t, b, l in zip(striplog['tops'], striplog['bases'],
+    #                    striplog['liths']):
 
-        origin = (0, t)
-        colour = '#' + l['map colour'].strip()
-        thick = b - t
+    #     origin = (0, t)
+    #     colour = '#' + l['map colour'].strip()
+    #     thick = b - t
 
-        if ladder:
-            w = legend[colour[1:]]['width']
-        else:
-            w = width
+    #     if ladder:
+    #         w = legend[colour[1:]]['width']
+    #     else:
+    #         w = width
 
-        rect = Rectangle(origin, w, thick, color=colour,
-                         edgecolor='k',
-                         linewidth=1.0, alpha=alpha)
-        ax.add_patch(rect)
+    #     rect = Rectangle(origin, w, thick, color=colour,
+    #                      edgecolor='k',
+    #                      linewidth=1.0, alpha=alpha)
+    #     ax.add_patch(rect)
 
-        ax.set_ylim([striplog['bases'][-1], 0])
+    #     ax.set_ylim([striplog['bases'][-1], 0])
 
 
 def get_curve_params(abbrev, fname):
@@ -56,22 +63,21 @@ def get_curve_params(abbrev, fname):
     returns a dictionary of petrophysical parameters for
     plotting purposes
     """
-    params = {}
+    params = {'acronym': abbrev}
     with open(fname, 'rU') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             if row['acronymn'] == abbrev:
-                params['acronymn'] = row['acronymn']
                 params['track'] = int(row['track'])
                 params['units'] = row['units']
                 params['xleft'] = float(row['xleft'])
                 params['xright'] = float(row['xright'])
                 params['logarithmic'] = row['logarithmic']
-                params['hexcolor'] = (row['hexcolor'])
+                params['hexcolor'] = row['hexcolor']
                 params['fill_left_cond'] = bool(row['fill_left_cond'])
-                params['fill_left'] = (row['fill_left'])
+                params['fill_left'] = row['fill_left']
                 params['fill_right_cond'] = bool(row['fill_right_cond'])
-                params['fill_right'] = (row['fill_right'])
+                params['fill_right'] = row['fill_right']
                 params['xticks'] = row['xticks'].split(',')
     return params
 
@@ -102,9 +108,20 @@ def despike(curve, curve_sm, max_clip):
     return out
 
 
-def uberPlot(transect, seismic_container, elevation_container,
-             log_container, bedrock_container, striplog_container,
-             em_container, extents):
+def uberPlot(transect_container):
+    """
+    Args:
+       transect (TransectContainer): A transect container.
+    """
+
+    seismic_container = transect_container.seismic
+    elevation_container = transect_container.elevation
+    log_container = transect_container.log
+    bedrock_container = transect_container.bedrock
+    striplog_container = transect_container.striplog
+    em_container = transect_container.dummy
+    extents = transect_container.extents
+    transect = transect_container.data
 
     # Lasciate ogni speranza, voi ch'entrate.
 
@@ -126,8 +143,8 @@ def uberPlot(transect, seismic_container, elevation_container,
     bedrock_data = bedrock_container.data  # List of dictionaries
     bedrock_x = bedrock_container.coords  # Range along transect
 
-    striplog_data = striplog_container.data  # List of dicts
-    striplog_x = striplog_container.coords  # Range along transect
+    # striplog_data = striplog_container.data  # List of dicts
+    # striplog_x = striplog_container.coords  # Range along transect
     striplog = striplog_container.get("P-129")
 
     em_data = em_container.data
@@ -168,8 +185,8 @@ def uberPlot(transect, seismic_container, elevation_container,
     right = 0.95    # right side of the subplots of the figure
     bottom = 0.1   # bottom of the subplots of the figure
     top = 0.9      # top of the subplots of the figure
-    wspace = 0.1   # amount of width reserved for blank space between subplots
-    hspace = 0.05   # amount of height reserved for white space between subplots
+    wspace = 0.1   # width reserved for blank space between subplots
+    hspace = 0.05   # height reserved for white space between subplots
     # adjust white space between subplots
 
     fig.subplots_adjust(left, bottom, right, top, wspace, hspace)
@@ -177,8 +194,6 @@ def uberPlot(transect, seismic_container, elevation_container,
     # ------------------------------------------------------------#
     # Plot the seismic cross section
     # ------------------------------------------------------------#
-
-    # Loop through each seismic line
     for coords, data in zip(seismic_x, seismic_data):
 
         z0 = 0
@@ -232,7 +247,6 @@ def uberPlot(transect, seismic_container, elevation_container,
     # ----------------------------------------------------------#
     # Elevation and bedrock plot
     # -----------------------------------------------------------#
-    # Could be done with LineCollection?
     for i, geo in enumerate(bedrock_data[:-1]):
 
         lim1 = bedrock_x[i]
@@ -304,7 +318,7 @@ def uberPlot(transect, seismic_container, elevation_container,
     for i in [0.0, 0.5]:
         # put the paragraph in twice (2 columns)
         description.text(i, 1.0,
-                         text,
+                         transect_container.description,
                          horizontalalignment='left',
                          verticalalignment='top',
                          fontsize=12
@@ -339,11 +353,8 @@ def uberPlot(transect, seismic_container, elevation_container,
     # -----------------------------------------------------------#
     # Em data
     # -----------------------------------------------------------#
-
     em.plot(em_x, em_data)
     em.axis("off")
-
-    # TODO
 
     # -----------------------------------------------------#
     # Feature plot header
@@ -356,33 +367,37 @@ def uberPlot(transect, seismic_container, elevation_container,
                      fontweight='bold'
                      )
     feat_header.axis("off")
+
     # -----------------------------------------------------#
-    #      Feature Plot - Oh Baby
+    #      Feature Plot
     # -----------------------------------------------------#
     fname = 'templates/Petrophysics_display_template.csv'
     params = get_curve_params('RT_HRLT', fname)
 
     logs = log_container.get("P-129")
 
-    Z = logs.data['DEPT']
-    GR = logs.data['GR']
-    DT = logs.data['DT']
-    DPHISS = logs.data['DPHI_SAN']
-    NPHISS = logs.data['NPHI_SAN']
-    DTS = logs.data['DTS']
-    RT_HRLT = logs.data['RT_HRLT']
-    RHOB = logs.data['RHOB']
-    DRHO = logs.data['DRHO']
+    if logs:
+        Z = logs.data['DEPT']
+        GR = logs.data['GR']
+        DT = logs.data['DT']
+        DPHISS = logs.data['DPHI_SAN']
+        NPHISS = logs.data['NPHI_SAN']
+        DTS = logs.data['DTS']
+        RT_HRLT = logs.data['RT_HRLT']
+        RHOB = logs.data['RHOB']
+        DRHO = logs.data['DRHO']
 
-    log_dict = {'GR': GR,
-                'DT': DT,
-                'DPHI_SAN': DPHISS,
-                'NPHI_SAN': NPHISS,
-                'DTS': DTS,
-                'RT_HRLT': RT_HRLT,
-                'RHOB': RHOB,
-                'DRHO': DRHO
-                }
+        log_dict = {'GR': GR,
+                    'DT': DT,
+                    'DPHI_SAN': DPHISS,
+                    'NPHI_SAN': NPHISS,
+                    'DTS': DTS,
+                    'RT_HRLT': RT_HRLT,
+                    'RHOB': RHOB,
+                    'DRHO': DRHO
+                    }
+    else:
+        log_dict = {}
 
     left = 0.125  # the left side of the subplots of the figure
     right = 0.9    # the right side of the subplots of the figure
@@ -423,7 +438,7 @@ def uberPlot(transect, seismic_container, elevation_container,
     plot_striplog(axs0[0], striplog, width=5, alpha=0.75,
                   ladder=True)
 
-    axs0[0].set_ylim([striplog['bases'][-1], 0])
+    #axs0[0].set_ylim([striplog['bases'][-1], 0])
 
     # Plot each curve with a white fill to fake the curve fill.
 
@@ -587,7 +602,8 @@ def uberPlot(transect, seismic_container, elevation_container,
         label.set_rotation(90)
         label.set_fontsize(10)
 
-    tops_fname = 'data/wells/P-129/tops/P-129_tops.txt'
+    las_dir = "/Users/matt/Dropbox/geotransect_test/data"
+    tops_fname = os.path.join(las_dir, "wells/P-129/tops/P-129_tops.txt")
     tops = get_tops(tops_fname)
 
     topx = get_curve_params('DT', fname)

@@ -18,19 +18,31 @@ import fiona
 from shapely.geometry import shape, Point
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
-from las import LASReader
 
+from las import LASReader
 from plot_lib import uberPlot
 from lithology.lithology import intervals_from_las3_string
+from sgy2shp import sgy2shp
+from utils import all_files
 
 
-class transectContainer():
+class BaseContainer(object):
+    """
+    Holds some basic information.
+    """
+    def __init__(self, params):  # Contains no data
+        # Parse params
+        for k, v in params.items():
+            setattr(self, k, v)
+
+
+class TransectContainer(BaseContainer):
     """
     Main driver class for generating transect plots. Builds and
     accesses all other plot containers
 
     usage:
-    tc = transectContainer(transect_dir, seismic_dir,
+    tc = TransectContainer(transect_dir, seismic_dir,
                            elevation_raster, las_dir,
                            extents)
 
@@ -49,30 +61,29 @@ class transectContainer():
 
     def __init__(self, params, data):
 
-        # Parse params
-        for k, v in params.items():
-            setattr(self, k, v)
+        # First generate the parent object.
+        super(TransectContainer, self).__init__(params)
 
         # Parse data
-        self.seismic = seismicContainer(data['seismic_dir'])
-        self.elevation = elevationContainer(data['elevation_file'])
-        self.log = lasContainer(data['well_dir'])
-        self.bedrock = bedrockContainer(data['bedrock_dir'])
-        self.striplog = striplogContainer(data['striplog_dir'])
+        self.seismic = SeismicContainer(data['seismic_dir'], params)
+        self.elevation = ElevationContainer(data['elevation_file'], params)
+        self.log = LogContainer(data['well_dir'], params)
+        self.bedrock = BedrockContainer(data['bedrock_dir'], params)
+        self.striplog = StriplogContainer(data['striplog_dir'], params)
 
         # Place holder for em/gravity etc.
-        self.dummy = dummyContainer()
+        self.dummy = DummyContainer()
 
-        # initialize transect list
-        # self.data = []
+        self.data = None
 
         # Read in all shape files
         with fiona.open(data['transect_file']) as c:
             for line in c:
                 if line['properties']['id'] == self.id:
                     self.data = shape(line['geometry'])
-                else:
-                    print "No transect with ID", self.id
+
+        if not self.data:
+            print "No transect with ID", self.id
 
     def plot(self):
         """
@@ -93,15 +104,12 @@ class transectContainer():
         self.striplog.update(transect)
         self.dummy.update(transect)
 
-        uberPlot(transect, self.seismic, self.elevation,
-                 self.log, self.bedrock,
-                 self.striplog, self.dummy,
-                 self.extents)
+        uberPlot(self)
 
         plt.show()
 
 
-class seismicContainer():
+class SeismicContainer(BaseContainer):
     """
     Class for reading and plotting seismic data.
 
@@ -116,23 +124,23 @@ class seismicContainer():
 
     @returns a seismicContainer object
     """
-    def __init__(self, seis_dir):
+    def __init__(self, seis_dir, params):
+
+        super(SeismicContainer, self).__init__(params)
 
         self.lookup = {}     # Look up table for points: segy/trace
         self.data = []       # plotting data
         self.coords = []     # transect coords of plot data
-        self.buffer = 300.0  # [m] of buffer for transect association
 
-        for f in fnmatch.filter(os.listdir(seis_dir), '*.shp'):
+        # This creates a (hidden) shapefile for each seismic line,
+        # then steps over them to read their positions and meta.
+        # TODO Simplify this... maybe don't even write the files.
+        sgy2shp(seis_dir, seis_dir)
 
-            print("Found shape files for seismic")
+        for f in fnmatch.filter(os.listdir(seis_dir), '.*.shp'):
             shapefile = os.path.join(seis_dir, f)
-
             with fiona.open(shapefile, "r") as traces:
-                print("Found seismic trace locations")
                 for trace in traces:
-                    # Map a point object to trace properties
-                    # (segyfile, trace)
                     self.lookup[shape(trace["geometry"])] = trace["properties"]
 
     def update(self, transect):
@@ -155,7 +163,6 @@ class seismicContainer():
 
         # Lookup for grouping traces into segy files
         file_lookup = {}
-        print("updating seismic transect")
         for point in points:
             meta = self.lookup[point]
             if(meta["segyfile"] in file_lookup):
@@ -163,7 +170,8 @@ class seismicContainer():
                 proj_d = transect.project(point)
                 if proj_d:
                     file_lookup[meta["segyfile"]]["pos"].append(proj_d)
-                    file_lookup[meta["segyfile"]]["trace"].append(meta["trace"])
+                    m = meta["trace"]
+                    file_lookup[meta["segyfile"]]["trace"].append(m)
             else:  # Make a new dict entry
                 file_lookup[meta["segyfile"]] = {}
                 file_lookup[meta["segyfile"]]["trace"] = [meta["trace"]]
@@ -172,12 +180,10 @@ class seismicContainer():
 
         # Read in the chunks from the segy file
         for segyfile in file_lookup.keys():
-
             segy = readSEGY(segyfile)
             traces = file_lookup[segyfile]["trace"]
             coords = file_lookup[segyfile]["pos"]
 
-            print("Read in seismic data")
             # sort the traces to be in order
             idx = sorted(range(len(traces)), key=lambda k: traces[k])
 
@@ -187,41 +193,31 @@ class seismicContainer():
             self.coords.append(np.array([coords[i] for i in idx]))
 
 
-class lasContainer():
+class LogContainer(BaseContainer):
     """
     Container for managing and plotting LAS data.
 
     usage:
 
-    lc = lasContainer(las_dir)
+    lc = LogContainer(las_dir)
 
     @param las_dir: Directory shape files of LAS headers.
 
-    @returns an lasContainer object/
+    @returns an LogContainer object/
     """
-    def __init__(self, las_dir):
+    def __init__(self, las_dir, params):
 
-        # Read in the shape file
+        super(LogContainer, self).__init__(params)
+
         self.lookup = {}      # maps points to LAS filenames
         self.data = []        # plot data
         self.coords = []      # transect coords of plot data
-        self.buffer = 300     # [m] buffer for transect association
         self.log_lookup = {}  # look up for log ids
 
-        for root, dirs, files in os.walk(las_dir):
-
-            try:
-                shp = os.path.join(root, fnmatch.filter(files, '*.shp')[0])
-            except:
-                continue
-
+        for shp in all_files(las_dir, '\\.shp$'):
             with fiona.open(shp, "r") as logs:
-
                 for log in logs:
-
-                    # add to the lookup table
-                    self.lookup[shape(log["geometry"])] =\
-                        log["properties"]
+                    self.lookup[shape(log["geometry"])] = log["properties"]
 
     def update(self, transect):
         """
@@ -244,10 +240,10 @@ class lasContainer():
         self.log_lookup = {}
 
         for point in points:
-
             meta = self.lookup[point]
-
             name = meta["name"]
+
+            # TODO: This has to be more dynamic
             filename = os.path.join('data', 'wells', name,
                                     'wireline_log', name +
                                     '_out.LAS')
@@ -260,6 +256,7 @@ class lasContainer():
             self.data.append(LASReader(filename, null_subs=np.nan))
             self.coords.append(transect.project(point))
             self.log_lookup[name] = self.data[-1]
+            print self.log_lookup
 
     def get(self, log_id):
         """
@@ -269,19 +266,22 @@ class lasContainer():
         return self.log_lookup.get(log_id)
 
 
-class elevationContainer():
+class ElevationContainer(BaseContainer):
     """
     Container for managing and plotting elevation data.
 
     usage:
-    ec = elevationContainer(elevation_raster)
+    ec = ElevationContainer(elevation_raster)
 
     @param elevation_raster: Raster file containing the elevation
                              profile of the area of interest.
 
-    @returns an elevationContainer object.
+    @returns an ElevationContainer object.
     """
-    def __init__(self, elevation_file):
+    def __init__(self, elevation_file, params):
+
+        super(ElevationContainer, self).__init__(params)
+
         # entire data set and grid
         self.elevation_profile = []
         self.elevation_grid = []
@@ -345,21 +345,21 @@ class elevationContainer():
             # add the distance to the coordinates
             self.coords[i] = n
 
-    def plot(self, extents, bedrock):
-        """
-        Plots the elevation profile.
-        @uses elevation_plot
+    # def plot(self, extents, bedrock):
+    #     """
+    #     Plots the elevation profile.
+    #     @uses elevation_plot
 
-        @param bedrock: bedrockContainer object
-        @param extents: Plot extents (x0,x1,z0,z1). Only x0 and x1
-                        are used.
-        """
-        elevation_plot(self, bedrock,
-                       [extents[0], extents[1]],
-                       np.amax(self.elevation_profile))
+    #     @param bedrock: BedrockContainer object
+    #     @param extents: Plot extents (x0,x1,z0,z1). Only x0 and x1
+    #                     are used.
+    #     """
+    #     elevation_plot(self, bedrock,
+    #                    [extents[0], extents[1]],
+    #                    np.amax(self.elevation_profile))
 
 
-class dummyContainer():
+class DummyContainer(BaseContainer):
     """
     Contains random data for placeholders.
     """
@@ -384,11 +384,14 @@ class dummyContainer():
         plt.ylim((-4, 4))
 
 
-class bedrockContainer():
+class BedrockContainer(BaseContainer):
     """
     Contains a geological map or similar basic geology shapes.
     """
-    def __init__(self, bedrock_dir):
+    def __init__(self, bedrock_dir, params):
+
+        super(BedrockContainer, self).__init__(params)
+
         self.lookup = {}
         self.data = []
         self.coords = []
@@ -421,7 +424,7 @@ class bedrockContainer():
         self.coords = np.array([self.coords[i] for i in idx])
 
 
-class striplogContainer(lasContainer):
+class StriplogContainer(LogContainer):
 
     def update(self, transect):
         # Preprocess
