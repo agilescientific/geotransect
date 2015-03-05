@@ -11,7 +11,7 @@ import os
 import sys
 import logging
 
-from obspy.segy.core import readSEGY
+import obspy
 import fiona
 from fiona import crs
 from shapely.geometry import Point, LineString, mapping
@@ -64,9 +64,9 @@ def sgy2shp(input_dir, output_dir, convert=False):
             filebase = os.path.splitext(os.path.basename(path))[0]
 
             # Read in the headers.
-            segy = readSEGY(path,
-                            headonly=True,
-                            unpack_trace_header=True)
+            segy = obspy.read(path,
+                              headonly=True,
+                              unpack_trace_header=True)
 
             points = []
 

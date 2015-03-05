@@ -7,12 +7,14 @@ params:
     basin: Windsor  # We should get this from the basins shapefile 
     id: 1
     description: This transect is the one we are using to test this module. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-    buffer: 3000
+    domain: depth  # Not currently used
+    buffer: 300
     depth:
         - 0
         - 3000
     data_dir: /Users/matt/Dropbox/geotransect_test/data
     feature_well: # P-129
+    seismic_log: GR  # Not currently used
     curve_display: templates/Petrophysics_display_template.csv
 
 data:
@@ -21,5 +23,7 @@ data:
     well_dir: wells
     elevation_file: elevation_raster/NS_DEM_ascii.asc
     bedrock_dir: bedrock
+    potfield_dir: potfield
+    basins_dir: basins  # Not currently used
     striplog_dir: wells
     tops_file: wells/P-129/tops/P-129_tops.txt  # Need to make this dynamic, or just handle in well
