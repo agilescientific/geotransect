@@ -66,9 +66,7 @@ class TransectContainer(BaseContainer):
         self.log = LogContainer(data['well_dir'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
         self.striplog = StriplogContainer(data['striplog_dir'], params)
-
-        # Place holder for em/gravity etc.
-        self.potfield = PotfieldContainer()
+        self.potfield = PotfieldContainer(data['potfield_dir'], params)
 
         # Set up 'data' — the transect line — from shapefile.
         self.data = None
@@ -344,19 +342,6 @@ class ElevationContainer(BaseContainer):
 
             # add the distance to the coordinates
             self.coords[i] = n
-
-    # def plot(self, extents, bedrock):
-    #     """
-    #     Plots the elevation profile.
-    #     @uses elevation_plot
-
-    #     @param bedrock: BedrockContainer object
-    #     @param extents: Plot extents (x0,x1,z0,z1). Only x0 and x1
-    #                     are used.
-    #     """
-    #     elevation_plot(self, bedrock,
-    #                    [extents[0], extents[1]],
-    #                    np.amax(self.elevation_profile))
 
 
 class PotfieldContainer(BaseContainer):
