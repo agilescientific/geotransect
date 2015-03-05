@@ -3,7 +3,8 @@
 # Configuration file for geoTransect.py
 
 params:
-    name: Test 
+    title: Test 
+    basin: Windsor  # We should get this from the basins shapefile 
     id: 1
     description: This transect is the one we are using to test this module.
     extents:
@@ -13,6 +14,8 @@ params:
         - 0
     buffer: 3000
     data_dir: /Users/matt/Dropbox/geotransect_test/data
+    feature_well: P-129
+    curve_display: templates/Petrophysics_display_template.csv
 
 data:
     transect_file: transects2Deliver/Transects.shp
@@ -21,3 +24,4 @@ data:
     elevation_file: elevation_raster/NS_DEM_ascii.asc
     bedrock_dir: bedrock
     striplog_dir: wells
+    tops_file: wells/P-129/tops/P-129_tops.txt  # Need to make this dynamic, or just handle in well

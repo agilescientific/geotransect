@@ -14,10 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
-from matplotlib.patches import Rectangle
 from matplotlib import gridspec
-
-from lithology.legends import legend
 
 
 def get_tops(fname):
@@ -60,8 +57,8 @@ def plot_striplog(ax, striplog, width=1,
 
 def get_curve_params(abbrev, fname):
     """
-    returns a dictionary of petrophysical parameters for
-    plotting purposes
+    Builds and returns a dictionary of petrophysical parameters for
+    plotting purposes.
     """
     params = {'acronym': abbrev}
     with open(fname, 'rU') as csvfile:
@@ -79,6 +76,7 @@ def get_curve_params(abbrev, fname):
                 params['fill_right_cond'] = bool(row['fill_right_cond'])
                 params['fill_right'] = row['fill_right']
                 params['xticks'] = row['xticks'].split(',')
+
     return params
 
 
@@ -108,19 +106,119 @@ def despike(curve, curve_sm, max_clip):
     return out
 
 
-def uberPlot(transect_container):
+def on_draw(event):
+    """
+    By Joe Kington
+    Auto-wraps all text objects in a figure at draw-time
+    """
+    import matplotlib as mpl
+    fig = event.canvas.figure
+
+    # Cycle through all artists in all the axes in the figure
+    for ax in fig.axes:
+        for artist in ax.get_children():
+            # If it's a text artist, wrap it...
+            if isinstance(artist, mpl.text.Text):
+                autowrap_text(artist, event.renderer)
+
+    # Temporarily disconnect any callbacks to the draw event...
+    # (To avoid recursion)
+    func_handles = fig.canvas.callbacks.callbacks[event.name]
+    fig.canvas.callbacks.callbacks[event.name] = {}
+    # Re-draw the figure..
+    fig.canvas.draw()
+    # Reset the draw event callbacks
+    fig.canvas.callbacks.callbacks[event.name] = func_handles
+
+
+def autowrap_text(textobj, renderer):
+    """
+    By Joe Kington
+    Wraps the given matplotlib text object so that it exceed the boundaries
+    of the axis it is plotted in.
+    """
+    import textwrap
+    # Get the starting position of the text in pixels...
+    x0, y0 = textobj.get_transform().transform(textobj.get_position())
+    # Get the extents of the current axis in pixels...
+    clip = textobj.get_axes().get_window_extent()
+    # Set the text to rotate about the left edge (doesn't make sense otherwise)
+    textobj.set_rotation_mode('anchor')
+
+    # Get the amount of space in the direction of rotation to the left and 
+    # right of x0, y0 (left and right are relative to the rotation, as well)
+    rotation = textobj.get_rotation()
+    right_space = min_dist_inside((x0, y0), rotation, clip)
+    left_space = min_dist_inside((x0, y0), rotation - 180, clip)
+
+    # Use either the left or right distance depending on the horiz alignment.
+    alignment = textobj.get_horizontalalignment()
+    if alignment is 'left':
+        new_width = right_space 
+    elif alignment is 'right':
+        new_width = left_space
+    else:
+        new_width = 2 * min(left_space, right_space)
+
+    # Estimate the width of the new size in characters...
+    aspect_ratio = 0.5 # This varies with the font!! 
+    fontsize = textobj.get_size()
+    pixels_per_char = aspect_ratio * renderer.points_to_pixels(fontsize)
+
+    # If wrap_width is < 1, just make it 1 character
+    wrap_width = max(1, new_width // pixels_per_char)
+    try:
+        wrapped_text = textwrap.fill(textobj.get_text(), wrap_width)
+    except TypeError:
+        # This appears to be a single word
+        wrapped_text = textobj.get_text()
+    textobj.set_text(wrapped_text)
+
+
+def min_dist_inside(point, rotation, box):
+    """
+    By Joe Kington
+    Gets the space in a given direction from "point" to the boundaries of
+    "box" (where box is an object with x0, y0, x1, & y1 attributes, point is a
+    tuple of x,y, and rotation is the angle in degrees)
+    """
+    from math import sin, cos, radians
+    x0, y0 = point
+    rotation = radians(rotation)
+    distances = []
+    threshold = 0.0001 
+    if cos(rotation) > threshold: 
+        # Intersects the right axis
+        distances.append((box.x1 - x0) / cos(rotation))
+    if cos(rotation) < -threshold: 
+        # Intersects the left axis
+        distances.append((box.x0 - x0) / cos(rotation))
+    if sin(rotation) > threshold: 
+        # Intersects the top axis
+        distances.append((box.y1 - y0) / sin(rotation))
+    if sin(rotation) < -threshold: 
+        # Intersects the bottom axis
+        distances.append((box.y0 - y0) / sin(rotation))
+    return min(distances)
+
+
+def uber_plot(transect_container):
     """
     Args:
        transect (TransectContainer): A transect container.
     """
+    # Params. 
+    extents = transect_container.extents
+    feature_well = transect_container.feature_well
 
+    # Containers. 
+    # TODO Can skip all of this
     seismic_container = transect_container.seismic
     elevation_container = transect_container.elevation
     log_container = transect_container.log
     bedrock_container = transect_container.bedrock
     striplog_container = transect_container.striplog
-    em_container = transect_container.dummy
-    extents = transect_container.extents
+    em_container = transect_container.dummy    
     transect = transect_container.data
 
     # Lasciate ogni speranza, voi ch'entrate.
@@ -128,6 +226,7 @@ def uberPlot(transect_container):
     # -------------------------------------------------#
     # get the data from the containers
     # --------------------------------------------------#
+    # TODO Can skip all of this too and just use tc directly.
     transectx, transecty = transect.coords.xy
 
     seismic_data = seismic_container.data  # list of 2D arrays
@@ -145,13 +244,13 @@ def uberPlot(transect_container):
 
     # striplog_data = striplog_container.data  # List of dicts
     # striplog_x = striplog_container.coords  # Range along transect
-    striplog = striplog_container.get("P-129")
+    striplog = striplog_container.get(feature_well)
 
     em_data = em_container.data
     em_x = em_container.coords
 
     # ------------------------------------------------------------#
-    # Figure Layout
+    # Figure layout
     # ------------------------------------------------------------#
 
     h = 15
@@ -169,7 +268,7 @@ def uberPlot(transect_container):
     large_scale = fig.add_subplot(gs[1:4, 2 * mw / 4:3 * mw / 4])
     small_scale = fig.add_subplot(gs[1:4, 3 * mw / 4:4 * mw / 4])
     feat_header = fig.add_subplot(gs[0:1, -5:])
-    ns_label = fig.add_subplot(gs[-1:, -5:])
+    logo = fig.add_subplot(gs[-1:, -5:])
 
     # featured = fig.add_subplot(gs[0:-1, 10:])
 
@@ -187,7 +286,6 @@ def uberPlot(transect_container):
     top = 0.9      # top of the subplots of the figure
     wspace = 0.1   # width reserved for blank space between subplots
     hspace = 0.05   # height reserved for white space between subplots
-    # adjust white space between subplots
 
     fig.subplots_adjust(left, bottom, right, top, wspace, hspace)
 
@@ -281,7 +379,7 @@ def uberPlot(transect_container):
     elevation.set_ylabel("Elevation [m]", fontsize=8)
 
     elevation.grid(True)
-    elevation.text(0.0, .5 * (max_height), "Surface Geology",
+    elevation.text(0.0, .5 * (max_height), "Surface geology",
                    props, rotation=0)
     elevation.set_frame_on(False)
 
@@ -291,7 +389,7 @@ def uberPlot(transect_container):
     header.axis("off")
     props["fontsize"] = 30
     dy = 0.2
-    header.text(0.0, 0.5 + dy, "Transect Title",
+    header.text(0.0, 0.5 + dy, transect_container.title,
                 props,
                 horizontalalignment='left',
                 verticalalignment='bottom'
@@ -306,8 +404,7 @@ def uberPlot(transect_container):
 
     # Meta description
     header.text(1.0, 0.5 + dy,
-                ("some meta data \n" +
-                 "about this transect"),
+                (transect_container.basin),
                 fontsize=14,
                 horizontalalignment='right',
                 verticalalignment='bottom')
@@ -315,18 +412,14 @@ def uberPlot(transect_container):
     # -----------------------------------------------------#
     # Paragraph description
     # -----------------------------------------------------#
-    for i in [0.0, 0.5]:
-        # put the paragraph in twice (2 columns)
-        description.text(i, 1.0,
-                         transect_container.description,
-                         horizontalalignment='left',
-                         verticalalignment='top',
-                         fontsize=12
-                         )
+    description.text(i, 1.0,
+                     transect_container.description,
+                     horizontalalignment='left',
+                     verticalalignment='top',
+                     fontsize=12
+                     )
 
     description.axis('off')
-    # description.set_xticks([])
-    # description.set_yticks([])
 
     # TODO figure out how to get a description
 
@@ -338,8 +431,6 @@ def uberPlot(transect_container):
     large_scale.patch.set_edgecolor("0.90")
     large_scale.set_xticks([])
     large_scale.set_yticks([])
-
-    # large_scale.axis("off")
 
     # --------------------------------------------------------#
     # Small scale map
@@ -360,7 +451,7 @@ def uberPlot(transect_container):
     # Feature plot header
     # -----------------------------------------------------#
     feat_header.text(0.0, 1.0,
-                     ("Well " + "P-129"),
+                     ("Well " + feature_well),
                      verticalalignment='top',
                      horizontalalignment='left',
                      fontsize=14,
@@ -371,33 +462,36 @@ def uberPlot(transect_container):
     # -----------------------------------------------------#
     #      Feature Plot
     # -----------------------------------------------------#
-    fname = 'templates/Petrophysics_display_template.csv'
-    params = get_curve_params('RT_HRLT', fname)
+    fname = transect_container.curve_display
+    
+    # params = get_curve_params('RT_HRLT', fname)
 
-    logs = log_container.get("P-129")
+    logs = log_container.get(feature_well)
 
-    if logs:
-        Z = logs.data['DEPT']
-        GR = logs.data['GR']
-        DT = logs.data['DT']
-        DPHISS = logs.data['DPHI_SAN']
-        NPHISS = logs.data['NPHI_SAN']
-        DTS = logs.data['DTS']
-        RT_HRLT = logs.data['RT_HRLT']
-        RHOB = logs.data['RHOB']
-        DRHO = logs.data['DRHO']
+    # if logs:
+    #     GR = logs.data['GR']
+    #     DT = logs.data['DT']
+    #     DPHISS = logs.data['DPHI_SAN']
+    #     NPHISS = logs.data['NPHI_SAN']
+    #     DTS = logs.data['DTS']
+    #     RT_HRLT = logs.data['RT_HRLT']
+    #     RHOB = logs.data['RHOB']
+    #     DRHO = logs.data['DRHO']
 
-        log_dict = {'GR': GR,
-                    'DT': DT,
-                    'DPHI_SAN': DPHISS,
-                    'NPHI_SAN': NPHISS,
-                    'DTS': DTS,
-                    'RT_HRLT': RT_HRLT,
-                    'RHOB': RHOB,
-                    'DRHO': DRHO
-                    }
-    else:
-        log_dict = {}
+    #     log_dict = {'GR': GR,
+    #                 'DT': DT,
+    #                 'DPHI_SAN': DPHISS,
+    #                 'NPHI_SAN': NPHISS,
+    #                 'DTS': DTS,
+    #                 'RT_HRLT': RT_HRLT,
+    #                 'RHOB': RHOB,
+    #                 'DRHO': DRHO
+    #                 }
+    # else:
+    #     log_dict = {}
+
+    Z = logs.data['DEPT']
+    curves = ['GR', 'DT', 'DPHI_SAN', 'NPHI_SAN', 'DTS', 'RT_HRLT', 'RHOB', 'DRHO']
 
     left = 0.125  # the left side of the subplots of the figure
     right = 0.9    # the right side of the subplots of the figure
@@ -444,10 +538,12 @@ def uberPlot(transect_container):
 
     label_shift = np.zeros(len(axs))
 
-    for curve, values in log_dict.iteritems():
+    for curve, values in logs.data.iteritems():
+
+        if curve not in curves:
+            continue
 
         params = get_curve_params(curve, fname)
-
         i = params['track']
 
         if i == 0:
@@ -455,7 +551,7 @@ def uberPlot(transect_container):
 
         j = 0  # default number of tracks to index into
 
-        ncurves = ncurv_per_track[i]
+        # ncurves = ncurv_per_track[i]
 
         label_shift[i] += 1
 
@@ -478,20 +574,20 @@ def uberPlot(transect_container):
         if smooth:
             values = rolling_window(values, window)
 
-        if params['acronymn'] == 'GR':
+        if curve == 'GR':
             j = 1  # second axis in first track
             label_shift[i] = 1
 
         # fill_left
         if params['fill_left_cond']:
             print params['fill_left_cond']
-            if params['acronymn'] == 'GR':
+            if curve == 'GR':
                 # do the fill for the lithology track
                 axs[i][j].fill_betweenx(Z, params['xleft'], values,
                                         facecolor=params['fill_left'],
                                         alpha=1.0, zorder=11)
 
-            if params['acronymn'] == 'DPHI_SAN':
+            if curve == 'DPHI_SAN':
                 # do the fill for the neutron porosity track
                 nphi = rolling_window(log_dict['NPHI_SAN'], window)
                 axs[i][j].fill_betweenx(Z,
@@ -510,7 +606,7 @@ def uberPlot(transect_container):
                                         alpha=0.5,
                                         zorder=12)
 
-        if params['acronymn'] == 'DRHO':
+        if curve == 'DRHO':
             blk_drho = 3.2
             values += blk_drho   # this is a hack to get DRHO on RHOB scale
             axs[i][j].fill_betweenx(Z,
@@ -543,7 +639,7 @@ def uberPlot(transect_container):
                                                      axs[i][j].transData)
 
         axs[i][j].text(xpos, -130 - 40 * (label_shift[i] - 1),
-                       params['acronymn'],
+                       curve,
                        horizontalalignment='center',
                        verticalalignment='bottom',
                        fontsize=12, color=params['hexcolor'],
@@ -585,6 +681,8 @@ def uberPlot(transect_container):
         if i != 0:
                 axs[i][j].set_yticklabels("")
 
+    # END of curve 'for' loop
+
     # add Depth label
 
     axs[0][0].text(-0.25, 50, 'MD \n $m$ ', fontsize='10',
@@ -602,8 +700,8 @@ def uberPlot(transect_container):
         label.set_rotation(90)
         label.set_fontsize(10)
 
-    las_dir = "/Users/matt/Dropbox/geotransect_test/data"
-    tops_fname = os.path.join(las_dir, "wells/P-129/tops/P-129_tops.txt")
+    tops_fname = os.path.join(transect_container.data_dir,
+                              transect_container.tops_file)
     tops = get_tops(tops_fname)
 
     topx = get_curve_params('DT', fname)
@@ -632,30 +730,30 @@ def uberPlot(transect_container):
                              weight='light')
 
     # --------------------------------------------------------------#
-    # LOGO
+    # Logo
     # --------------------------------------------------------------#
 
-    img = Image.open("logo.png")
-    arr = np.array(img)
+    im = Image.open("logo.png")
+    im = np.array(im).astype(np.float) / 255
+    width, height = im.size
 
-    # Broken
-    # ns_label.imshow(arr, aspect="auto")
-    # ns_label.axis('off')
+    # Place in axis:
+    # logo.imshow(im, aspect="auto")
+    # logo.axis('off')
 
-    ns_label.text(0.9, 0.7, "L O G O",
-                  verticalalignment='top',
-                  horizontalalignment='right')
+    # Place on figure:
+    fig.figimage(im, 0, fig.bbox.ymax - height)
 
-    ns_label.text(0.1, 0.7,
+    logo.text(0.1, 0.7,
                   ("Department of Energy \n" +
                    "Nova Scotia, Canada"),
                   verticalalignment='top',
                   horizontalalignment='left')
 
-    # horizontal line
-    ns_label.axhline(y=0.7,
+    # Horizontal line.
+    logo.axhline(y=0.7,
                      xmin=0.1,
                      xmax=0.9,
                      linewidth=1,
                      color='k')
-    ns_label.axis("off")
+    logo.axis("off")

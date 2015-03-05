@@ -20,7 +20,7 @@ from shapely.prepared import prep
 from obspy.segy.core import readSEGY
 
 from las import LASReader
-from plot_lib import uberPlot
+from plot_lib import uber_plot
 from lithology.lithology import intervals_from_las3_string
 from sgy2shp import sgy2shp
 from utils import all_files
@@ -28,7 +28,9 @@ from utils import all_files
 
 class BaseContainer(object):
     """
-    Holds some basic information.
+    Holds some basic information that we want in every object.
+
+    Maybe eventually we can abstract some of the methods here too.
     """
     def __init__(self, params):  # Contains no data
         # Parse params
@@ -46,17 +48,13 @@ class TransectContainer(BaseContainer):
                            elevation_raster, las_dir,
                            extents)
 
-    @param transect_dir: Directory containing shape files of the
-                         transects.
-    @param seismic_dir: Directory containing the shape files of
-                        the SEGY trace headers.
+    @param transect_dir: Directory containing shape files of the transects.
+    @param seismic_dir: Directory containing the shape files of the SEGY trace headers.
     @param elevation_raster: Raster file of the entire elevation profile.
     @param las_dir: Directory containing shape files for well log headers.
     @param extents: X and depth limits of the plot (X0,X1, Z0, Z1)
 
     @returns a transectContainer object.
-
-    tc.plot() to generate transect plots
     """
 
     def __init__(self, params, data):
@@ -65,6 +63,7 @@ class TransectContainer(BaseContainer):
         super(TransectContainer, self).__init__(params)
 
         # Parse data
+        self.tops_file = data['tops_file']
         self.seismic = SeismicContainer(data['seismic_dir'], params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.log = LogContainer(data['well_dir'], params)
@@ -104,7 +103,7 @@ class TransectContainer(BaseContainer):
         self.striplog.update(transect)
         self.dummy.update(transect)
 
-        uberPlot(self)
+        uber_plot(self)
 
         plt.show()
 
@@ -126,6 +125,7 @@ class SeismicContainer(BaseContainer):
     """
     def __init__(self, seis_dir, params):
 
+        # First generate the parent object.
         super(SeismicContainer, self).__init__(params)
 
         self.lookup = {}     # Look up table for points: segy/trace
@@ -207,6 +207,7 @@ class LogContainer(BaseContainer):
     """
     def __init__(self, las_dir, params):
 
+        # First generate the parent object.
         super(LogContainer, self).__init__(params)
 
         self.lookup = {}      # maps points to LAS filenames
@@ -280,6 +281,7 @@ class ElevationContainer(BaseContainer):
     """
     def __init__(self, elevation_file, params):
 
+        # First generate the parent object.
         super(ElevationContainer, self).__init__(params)
 
         # entire data set and grid
