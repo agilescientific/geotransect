@@ -28,14 +28,18 @@ from utils import all_files
 
 class BaseContainer(object):
     """
-    Holds some basic information that we want in every object.
-
-    Maybe eventually we can abstract some of the methods here too.
+    Holds some basic information that we want in every object. Does not
+    contain any data or pointers, only the transect parameters. Maybe
+    eventually we can abstract some of the methods here too.
     """
-    def __init__(self, params):  # Contains no data
-        # Parse params
+    def __init__(self, params):
+
         for k, v in params.items():
             setattr(self, k, v)
+
+        # The x extent will be updated at plot time.
+        # TODO Make this less cryptic, or use two objects.
+        self.extents = [0, 0, self.depth[1], self.depth[0]]
 
 
 class TransectContainer(BaseContainer):
@@ -44,25 +48,18 @@ class TransectContainer(BaseContainer):
     accesses all other plot containers
 
     usage:
-    tc = TransectContainer(transect_dir, seismic_dir,
-                           elevation_raster, las_dir,
-                           extents)
+    tc = TransectContainer(params, data)
 
-    @param transect_dir: Directory containing shape files of the transects.
-    @param seismic_dir: Directory containing the shape files of the SEGY trace headers.
-    @param elevation_raster: Raster file of the entire elevation profile.
-    @param las_dir: Directory containing shape files for well log headers.
-    @param extents: X and depth limits of the plot (X0,X1, Z0, Z1)
+    @param params: Directory containing shape files of the transects.
+    @param data: Contains the shape files of the SEGY trace headers.
 
     @returns a transectContainer object.
     """
 
     def __init__(self, params, data):
 
-        # First generate the parent object.
         super(TransectContainer, self).__init__(params)
 
-        # Parse data
         self.tops_file = data['tops_file']
         self.seismic = SeismicContainer(data['seismic_dir'], params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
@@ -71,16 +68,14 @@ class TransectContainer(BaseContainer):
         self.striplog = StriplogContainer(data['striplog_dir'], params)
 
         # Place holder for em/gravity etc.
-        self.dummy = DummyContainer()
+        self.potfield = PotfieldContainer()
 
+        # Set up 'data' — the transect line — from shapefile.
         self.data = None
-
-        # Read in all shape files
         with fiona.open(data['transect_file']) as c:
             for line in c:
                 if line['properties']['id'] == self.id:
                     self.data = shape(line['geometry'])
-
         if not self.data:
             print "No transect with ID", self.id
 
@@ -89,10 +84,10 @@ class TransectContainer(BaseContainer):
         Generates plot for the transect.
         """
 
-        # for transect in self.data:
         transect = self.data
 
         # Set the extent to the length? Or keep them all the same?
+        self.extents[0] = 0
         self.extents[1] = transect.length
 
         # update the containers
@@ -101,7 +96,7 @@ class TransectContainer(BaseContainer):
         self.elevation.update(transect)
         self.bedrock.update(transect)
         self.striplog.update(transect)
-        self.dummy.update(transect)
+        self.potfield.update(transect)
 
         uber_plot(self)
 
@@ -203,7 +198,7 @@ class LogContainer(BaseContainer):
 
     @param las_dir: Directory shape files of LAS headers.
 
-    @returns an LogContainer object/
+    @returns an LogContainer object.
     """
     def __init__(self, las_dir, params):
 
@@ -229,6 +224,8 @@ class LogContainer(BaseContainer):
                          object.
         """
 
+        print "Updating log container",
+
         # Preprocess
         prepared = prep(transect.buffer(self.buffer))
 
@@ -244,6 +241,8 @@ class LogContainer(BaseContainer):
             meta = self.lookup[point]
             name = meta["name"]
 
+            print name,
+
             # TODO: This has to be more dynamic
             filename = os.path.join('data', 'wells', name,
                                     'wireline_log', name +
@@ -257,7 +256,6 @@ class LogContainer(BaseContainer):
             self.data.append(LASReader(filename, null_subs=np.nan))
             self.coords.append(transect.project(point))
             self.log_lookup[name] = self.data[-1]
-            print self.log_lookup
 
     def get(self, log_id):
         """
@@ -361,7 +359,7 @@ class ElevationContainer(BaseContainer):
     #                    np.amax(self.elevation_profile))
 
 
-class DummyContainer(BaseContainer):
+class PotfieldContainer(BaseContainer):
     """
     Contains random data for placeholders.
     """
