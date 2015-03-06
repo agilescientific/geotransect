@@ -5,9 +5,9 @@
 # Params are passed directly to the TransectContainer object, and all of the
 # Containers it contains. So you have access to them everywhere. 
 params:
-    title: Transect 1 
+    title: Transect 2 
     basin: Windsor  # We should get this from the basins shapefile 
-    id: 1
+    id: 2
     description: This transect is the one we are using to test this module. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
     domain: depth  # Not currently used
     buffer: 300

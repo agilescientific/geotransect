@@ -8,17 +8,20 @@ Functions for plotting.
 """
 import csv
 import os
+from functools import partial
 
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
 from matplotlib import gridspec
-from mpl_toolkits.basemap import Basemap
+from shapely.ops import transform
+import pyproj as pp
 
 from autowrap import on_draw
-from utils import rolling_median
+import utils
 
 
 def get_tops(fname):
@@ -66,7 +69,71 @@ def get_curve_params(abbrev, fname):
     return params
 
 
+def plot_line(m, line, colour='b', lw=1, alpha=1):
+    """
+    Plots a line given a line with lon,lat coordinates.
+
+    Note:
+        This means you probably have to call shapely `transform` on your
+        line before passing it to this function.
+
+        There is a helper partial function in utils called `utm2lola` which
+        makes this easy.
+
+    Args:
+        m (Basemap): A matplotlib Basemap.
+        line (shape): A shapely geometry.
+        colour (str): A colour from the matplotlib dictionary.
+
+    Returns:
+        List: A list of matplotlib lines.
+    """
+    lo, la = line.xy
+    x, y = m(lo, la)
+    return m.plot(x, y,
+                  color=colour,
+                  linewidth=lw,
+                  alpha=alpha,
+                  solid_capstyle='round')
+
+
+def plot_point(m, point, colour='b', shape='o', alpha=1):
+    """
+    Plots a point given a point with lon,lat coordinates.
+
+    Note:
+        This means you probably have to call shapely `transform` on your
+        point before passing it to this function.
+
+        There is a helper partial function in utils called `utm2lola` which
+        makes this easy.
+
+    Args:
+        m (Basemap): A matplotlib Basemap.
+        point (shape): A shapely geometry.
+        colour (str): A colour from the matplotlib dictionary.
+
+    Returns:
+        List: A list of matplotlib points.
+    """
+    lo, la = point.xy
+    x, y = m(lo, la)
+    return m.scatter(x, y,
+                     s=10,
+                     color=colour,
+                     alpha=alpha)
+
+
 def draw_basemap(m):
+    """
+    Puts some standard bits of decoration on a matplotlib Basemap.
+
+    Args:
+        m (Basemap): A matplotlib Basemap.
+
+    Returns:
+        m (Basemap): The newly decorated Basemap.
+    """
     m.drawcoastlines(color='#9caf9c')
     m.drawcountries()
     m.fillcontinents(color='#d8e3d8')
@@ -76,10 +143,10 @@ def draw_basemap(m):
     return m
 
 
-def uber_plot(tc):
+def plot(tc):
     """
     Args:
-       transect (TransectContainer): A transect container.
+        transect (TransectContainer): A transect container.
     """
 
     h = 15
@@ -96,7 +163,7 @@ def uber_plot(tc):
     gs = gridspec.GridSpec(h, mw + fw + 1)
 
     header = fig.add_subplot(gs[0:1, 0:mw/2])
-    description = fig.add_subplot(gs[1:3, 0:2*mw/4])
+    description = fig.add_subplot(gs[1:3, 0:mw/2])
     locmap = fig.add_subplot(gs[0:3, mw/2:mw])  # Aspect = 8:3
     elevation = fig.add_subplot(gs[3, :mw])
     xsection = fig.add_subplot(gs[4:h-grids, :mw])
@@ -164,11 +231,32 @@ def uber_plot(tc):
     # ---------------------------------------------------------#
     tx, ty = tc.data.coords.xy
 
-    locmap.plot(tx, ty)
-    locmap.patch.set_facecolor("0.95")
-    locmap.patch.set_edgecolor("0.90")
-    locmap.set_xticks([])
-    locmap.set_yticks([])
+    res = 'h'   # c, l, i, h, f
+
+    # Generate Basemap object.
+    m = Basemap(projection='tmerc',
+                lon_0=tc.locmap.mid.x, lat_0=tc.locmap.mid.y,
+                resolution=res,
+                llcrnrlon=tc.locmap.ll.x, llcrnrlat=tc.locmap.ll.y,
+                urcrnrlon=tc.locmap.ur.x, urcrnrlat=tc.locmap.ur.y,
+                ax=locmap)
+
+    # Plot the seismic lines
+    for l in tc.locmap.seismic:
+        line_t = utils.utm2lola(l)
+        plot_line(m, line_t, colour='black', alpha=0.3)
+
+    # Plot the wells
+    for p in tc.locmap.wells:
+        point_t = utils.utm2lola(p)
+        plot_point(m, point_t, colour='black', alpha=0.6)
+
+    # Plot this transect line
+    line_t = utils.utm2lola(tc.data)
+    plot_line(m, line_t, colour='r', lw=3)
+
+    # Finish drawing the basemap.
+    draw_basemap(m)
 
     # --------------------------------------------------------#
     # Small scale map
@@ -378,7 +466,7 @@ def uber_plot(tc):
                 xpos = midline
 
             if smooth:
-                values = rolling_median(values, window)
+                values = utils.rolling_median(values, window)
 
             if curve == 'GR':
                 j = 1  # second axis in first track
@@ -395,7 +483,7 @@ def uber_plot(tc):
 
                 if curve == 'DPHI_SAN':
                     # do the fill for the neutron porosity track
-                    nphi = rolling_median(logs.data['NPHI_SAN'], window)
+                    nphi = utils.rolling_median(logs.data['NPHI_SAN'], window)
                     axs[i][j].fill_betweenx(Z,
                                             nphi,
                                             values,
@@ -540,8 +628,8 @@ def uber_plot(tc):
     # --------------------------------------------------------------#
     # Logo
     # --------------------------------------------------------------#
-
-    im = Image.open("logo.png")
+    path = os.path.join(tc.data_dir, tc.images_dir, 'logo.png')
+    im = Image.open(path)
     im = np.array(im).astype(np.float) / 255
     # width, height = im.size
 

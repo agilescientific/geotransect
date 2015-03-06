@@ -11,8 +11,8 @@ import fnmatch
 from functools import partial
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
 import numpy as np
-
 import pyproj as pp
 import rasterio
 import fiona
@@ -22,10 +22,10 @@ from shapely.prepared import prep
 from obspy.segy.core import readSEGY
 
 from las import LASReader
-from uberplot import uber_plot
+from plot import plot
 from lithology.lithology import intervals_from_las3_string
 from sgy2shp import sgy2shp
-from utils import all_files
+import utils
 
 
 class BaseContainer(object):
@@ -50,7 +50,7 @@ class TransectContainer(BaseContainer):
     accesses all other plot containers
 
     usage:
-    tc = TransectContainer(params, data)
+        tc = TransectContainer(params, data)
 
     @param params: Directory containing shape files of the transects.
     @param data: Contains the shape files of the SEGY trace headers.
@@ -58,7 +58,7 @@ class TransectContainer(BaseContainer):
     @returns a transectContainer object.
     """
 
-    def __init__(self, params, data):
+    def __init__(self, params, layers, data):
 
         super(TransectContainer, self).__init__(params)
 
@@ -69,7 +69,9 @@ class TransectContainer(BaseContainer):
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
         self.striplog = StriplogContainer(data['striplog_dir'], params)
         self.potfield = PotfieldContainer(data['potfield_dir'], params)
-        self.locmap = LocmapContainer(data['locmap_contents'], params)
+        self.locmap = LocmapContainer(layers, params)
+
+        print "Starting", self.title, "id", self.id
 
         # Set up 'data' — the transect line — from shapefile.
         self.data = None
@@ -98,7 +100,7 @@ class TransectContainer(BaseContainer):
         self.potfield.update(self.data)
         self.locmap.update(self.data)
 
-        uber_plot(self)
+        plot(self)
 
         plt.show()
 
@@ -107,50 +109,49 @@ class LocmapContainer(BaseContainer):
     """
     Class for building and plotting a location map.
 
-    USAGE:
-    seis = seismicContainer(seis_dir)
+    Args:
+        layers (dict): The relative paths to files to use as layers.
+        params (dict): The parameters, as specified in the config.
 
-    @param seis_dir: Input directory containing seismic shapefiles.
-                     The shapefiles contain points corresponding to
-                     UTM trace locations with fields segyfile,
-                     trace.
-
-    @returns a seismicContainer object
+    Example:
+        >>> layers = ['geology.tif', 'roads.shp']
+        >>> params = {'domain': 'depth', 'buffer': 300, ... }
+        >>> mc = LocmapContainer(layers, params)
     """
-    def __init__(self, contents, params):
+    def __init__(self, layers, params):
 
         # First generate the parent object.
         super(LocmapContainer, self).__init__(params)
 
-        # contents is a list of vector or raster layers to plot.
-        # The list is in order, the first item will be the top layer.
-
-        self.contents = contents
+        # contents is an OrderedDict of vector or raster layers to plot.
+        # The first item will be the top layer.
+        self.layers = layers
         self.mid = None
 
     def update(self, transect):
 
-        pad = 5000  # m ... interior padding for map box
+        print "Updating map container"
 
-        ll_nad83 = pp.Proj("+proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs")
-        utm_nad83 = pp.Proj("+init=EPSG:26920")
-        project = partial(pp.transform, utm_nad83, ll_nad83)
+        pad = 5000      # m ... interior padding for map box
+        aspect = 12/3.  # I was expecting it to be 8:3.
 
         bounds = transect.bounds
         llx, lly, urx, ury = bounds
         w, h = urx - llx, ury - lly
 
-        # Guarantees the map with have 8:3 aspect
+        # Guarantees the map will have correct aspect
         x_adj, y_adj = 0, 0
-        if h > (w*3/8):
-            print "adjusting x"
-            x_adj = ((8*h/3.) - w) / 2.  # Aspect is hard-coded in uberplot
-        else:                            # TODO Fix that!
-            print "adjusting y"
-            y_adj = ((3*w/8.) - h) / 2.
+        if h > (w/aspect):
+            x_adj = ((aspect*h) - w) / 2.  # Aspect is hard-coded in uberplot
+        else:                              # TODO Fix that!
+            y_adj = ((w/aspect) - h) / 2.
 
-        ll = transform(project, Point(llx-pad-x_adj, lly-pad-y_adj))
-        ur = transform(project, Point(urx+pad+x_adj, ury+pad+y_adj))
+        utm_nad83 = pp.Proj("+init=EPSG:26920")
+        ll_nad83 = pp.Proj("+proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs")
+        utm2lola = partial(pp.transform, utm_nad83, ll_nad83)
+
+        ll = transform(utm2lola, Point(llx-pad-x_adj, lly-pad-y_adj))
+        ur = transform(utm2lola, Point(urx+pad+x_adj, ury+pad+y_adj))
         self.ll, self.ur = ll, ur
         self.mid = Point(ll.x + 0.5*(ur.x-ll.x), ll.y + 0.5*(ur.y - ll.y))
 
@@ -158,8 +159,14 @@ class LocmapContainer(BaseContainer):
         # we just want to find / compute data here
         # we need to distinguish between shp and raster
 
-        for layer in self.contents:
-            pass
+        for layer, fname in self.layers.items():
+            print layer, fname
+            items = []
+            if fname.endswith(".shp"):
+                with fiona.open(fname) as c:  # collection
+                    for s in c:
+                        items.append(shape(s['geometry']))
+            setattr(self, layer, items)
 
 
 class SeismicContainer(BaseContainer):
@@ -167,16 +174,13 @@ class SeismicContainer(BaseContainer):
     Class for reading and plotting seismic data.
 
     Args:
-      seis_dir: Input directory containing seismic shapefiles.
-                The shapefiles contain points corresponding to
-                UTM trace locations with fields segyfile, trace.
-
-    Returns:
-      SeismicContainer: A container for seismic data. 
+        seis_dir (str): Input directory containing seismic SEGY files.
+        params (dict): The parameters, as specified in the config.
 
     Example:
-      >>> seis = seismicContainer(seis_dir)
-
+        >>> seis_dir = 'seismic/segy_files/'
+        >>> params = {'domain': 'depth', 'buffer': 300, ... }
+        >>> seis = seismicContainer(seis_dir, params)
     """
     def __init__(self, seis_dir, params):
 
@@ -203,11 +207,14 @@ class SeismicContainer(BaseContainer):
         Updates the container data to traces that intersect the transect line.
 
         Args:
-          transect: A transect line as a Shapely LineString object.
+            transect: A transect line as a Shapely LineString object.
 
         Returns:
-          None: Does not return anything.
+            None: Does not return anything.
         """
+
+        print "Updating seismic container"
+
         # Preprocessing
         prepared = prep(transect.buffer(self.buffer))
 
@@ -255,15 +262,12 @@ class LogContainer(BaseContainer):
     Container for managing and plotting LAS data.
 
     Args:
-      las_dir (str): Directory shape files of LAS headers.
-
-    Returns:
-      LogContainer: A container object for log data. 
+        las_dir (str): Directory shape files of LAS headers.
 
     Example:
-
-      >>> lc = LogContainer(las_dir)
-
+        >>> las_dir = 'wells/logs/'
+        >>> params = {'domain': 'depth', 'buffer': 300, ... }
+        >>> lc = LogContainer(las_dir, params)
     """
     def __init__(self, las_dir, params):
 
@@ -275,7 +279,7 @@ class LogContainer(BaseContainer):
         self.coords = []      # transect coords of plot data
         self.log_lookup = {}  # look up for log ids
 
-        for shp in all_files(las_dir, '\\.shp$'):
+        for shp in utils.all_files(las_dir, '\\.shp$'):
             with fiona.open(shp, "r") as logs:
                 for log in logs:
                     self.lookup[shape(log["geometry"])] = log["properties"]
@@ -326,7 +330,6 @@ class LogContainer(BaseContainer):
         """
         Returns data corresponding to log_id
         """
-
         return self.log_lookup.get(log_id)
 
 
