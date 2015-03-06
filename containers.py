@@ -166,15 +166,17 @@ class SeismicContainer(BaseContainer):
     """
     Class for reading and plotting seismic data.
 
-    USAGE:
-    seis = seismicContainer(seis_dir)
+    Args:
+      seis_dir: Input directory containing seismic shapefiles.
+                The shapefiles contain points corresponding to
+                UTM trace locations with fields segyfile, trace.
 
-    @param seis_dir: Input directory containing seismic shapefiles.
-                     The shapefiles contain points corresponding to
-                     UTM trace locations with fields segyfile,
-                     trace.
+    Returns:
+      SeismicContainer: A container for seismic data. 
 
-    @returns a seismicContainer object
+    Example:
+      >>> seis = seismicContainer(seis_dir)
+
     """
     def __init__(self, seis_dir, params):
 
@@ -198,11 +200,13 @@ class SeismicContainer(BaseContainer):
 
     def update(self, transect):
         """
-        Updates the container data to traces that intersect
-        the transect line.
+        Updates the container data to traces that intersect the transect line.
 
-        @param transect: A transect line as a shapely LineString
-                         object.
+        Args:
+          transect: A transect line as a Shapely LineString object.
+
+        Returns:
+          None: Does not return anything.
         """
         # Preprocessing
         prepared = prep(transect.buffer(self.buffer))
@@ -250,13 +254,16 @@ class LogContainer(BaseContainer):
     """
     Container for managing and plotting LAS data.
 
-    usage:
+    Args:
+      las_dir (str): Directory shape files of LAS headers.
 
-    lc = LogContainer(las_dir)
+    Returns:
+      LogContainer: A container object for log data. 
 
-    @param las_dir: Directory shape files of LAS headers.
+    Example:
 
-    @returns an LogContainer object.
+      >>> lc = LogContainer(las_dir)
+
     """
     def __init__(self, las_dir, params):
 
