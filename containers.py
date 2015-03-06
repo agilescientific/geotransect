@@ -8,6 +8,7 @@ Defines various data containers for plotting a transect.
 """
 import os
 import fnmatch
+from functools import partial
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,12 +16,13 @@ import numpy as np
 import pyproj as pp
 import rasterio
 import fiona
-from shapely.geometry import shape, Point
+from shapely.geometry import shape, Point, LineString
+from shapely.ops import transform
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
 
 from las import LASReader
-from plot_lib import uber_plot
+from uberplot import uber_plot
 from lithology.lithology import intervals_from_las3_string
 from sgy2shp import sgy2shp
 from utils import all_files
@@ -67,6 +69,7 @@ class TransectContainer(BaseContainer):
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
         self.striplog = StriplogContainer(data['striplog_dir'], params)
         self.potfield = PotfieldContainer(data['potfield_dir'], params)
+        self.locmap = LocmapContainer(data['locmap_contents'], params)
 
         # Set up 'data' — the transect line — from shapefile.
         self.data = None
@@ -82,23 +85,81 @@ class TransectContainer(BaseContainer):
         Generates plot for the transect.
         """
 
-        transect = self.data
-
         # Set the extent to the length? Or keep them all the same?
         self.extents[0] = 0
-        self.extents[1] = transect.length
+        self.extents[1] = self.data.length
 
         # update the containers
-        self.seismic.update(transect)
-        self.log.update(transect)
-        self.elevation.update(transect)
-        self.bedrock.update(transect)
-        self.striplog.update(transect)
-        self.potfield.update(transect)
+        self.seismic.update(self.data)
+        self.log.update(self.data)
+        self.elevation.update(self.data)
+        self.bedrock.update(self.data)
+        self.striplog.update(self.data)
+        self.potfield.update(self.data)
+        self.locmap.update(self.data)
 
         uber_plot(self)
 
         plt.show()
+
+
+class LocmapContainer(BaseContainer):
+    """
+    Class for building and plotting a location map.
+
+    USAGE:
+    seis = seismicContainer(seis_dir)
+
+    @param seis_dir: Input directory containing seismic shapefiles.
+                     The shapefiles contain points corresponding to
+                     UTM trace locations with fields segyfile,
+                     trace.
+
+    @returns a seismicContainer object
+    """
+    def __init__(self, contents, params):
+
+        # First generate the parent object.
+        super(LocmapContainer, self).__init__(params)
+
+        # contents is a list of vector or raster layers to plot.
+        # The list is in order, the first item will be the top layer.
+
+        self.contents = contents
+        self.mid = None
+
+    def update(self, transect):
+
+        pad = 5000  # m ... interior padding for map box
+
+        ll_nad83 = pp.Proj("+proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs")
+        utm_nad83 = pp.Proj("+init=EPSG:26920")
+        project = partial(pp.transform, utm_nad83, ll_nad83)
+
+        bounds = transect.bounds
+        llx, lly, urx, ury = bounds
+        w, h = urx - llx, ury - lly
+
+        # Guarantees the map with have 8:3 aspect
+        x_adj, y_adj = 0, 0
+        if h > (w*3/8):
+            print "adjusting x"
+            x_adj = ((8*h/3.) - w) / 2.  # Aspect is hard-coded in uberplot
+        else:                            # TODO Fix that!
+            print "adjusting y"
+            y_adj = ((3*w/8.) - h) / 2.
+
+        ll = transform(project, Point(llx-pad-x_adj, lly-pad-y_adj))
+        ur = transform(project, Point(urx+pad+x_adj, ury+pad+y_adj))
+        self.ll, self.ur = ll, ur
+        self.mid = Point(ll.x + 0.5*(ur.x-ll.x), ll.y + 0.5*(ur.y - ll.y))
+
+        # the goal is to send data to uberplot to plot
+        # we just want to find / compute data here
+        # we need to distinguish between shp and raster
+
+        for layer in self.contents:
+            pass
 
 
 class SeismicContainer(BaseContainer):
@@ -106,7 +167,6 @@ class SeismicContainer(BaseContainer):
     Class for reading and plotting seismic data.
 
     USAGE:
-
     seis = seismicContainer(seis_dir)
 
     @param seis_dir: Input directory containing seismic shapefiles.
@@ -277,18 +337,14 @@ class ElevationContainer(BaseContainer):
     """
     def __init__(self, elevation_file, params):
 
-        # First generate the parent object.
         super(ElevationContainer, self).__init__(params)
 
-        # entire data set and grid
         self.elevation_profile = []
         self.elevation_grid = []
 
-        # plotting data and transect coordinates
         self.data = []
         self.coords = []
 
-        # decimation factor
         decimate = 1
 
         with rasterio.drivers(CPL_DEBUG=True):
@@ -296,16 +352,15 @@ class ElevationContainer(BaseContainer):
                 self.elevation_profile = src.read()[0, 0:-1:decimate,
                                                     0:-1:decimate]
 
-                # Get as lat/lon using the affine coordinate
-                # transform
+                # Get as lat/lon using the affine coordinate transform
+                # TODO - do this with proj? Why go via lo/la?
                 la = np.arange(self.elevation_profile.shape[1])
                 lo = np.arange(self.elevation_profile.shape[0])
                 lat = la * src.affine[0]*decimate + src.affine[2]
                 lon = lo * src.affine[4]*decimate + src.affine[5]
                 wgs_grid = np.meshgrid(lat, lon)
 
-                # Maybe these should be config params and not hard
-                # coded?
+                # TODO move to config
                 ll_wgs84 = pp.Proj("+init=EPSG:4269")
                 utm_nad83 = pp.Proj("+init=EPSG:26920")
 
@@ -348,7 +403,9 @@ class PotfieldContainer(BaseContainer):
     """
     Contains random data for placeholders.
     """
-    def __init__(self):
+    def __init__(self, potfield_dir, params):
+        super(PotfieldContainer, self).__init__(params)
+
         self.data = []
         self.coords = []
 

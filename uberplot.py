@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
 from matplotlib import gridspec
+from mpl_toolkits.basemap import Basemap
 
 from autowrap import on_draw
 from utils import rolling_median
@@ -65,6 +66,16 @@ def get_curve_params(abbrev, fname):
     return params
 
 
+def draw_basemap(m):
+    m.drawcoastlines(color='#9caf9c')
+    m.drawcountries()
+    m.fillcontinents(color='#d8e3d8')
+    m.drawmapboundary(color='gray')
+    m.drawmeridians(np.arange(0, 360, 1), color='gray')
+    m.drawparallels(np.arange(-90, 90, 1), color='gray')
+    return m
+
+
 def uber_plot(tc):
     """
     Args:
@@ -74,24 +85,26 @@ def uber_plot(tc):
     h = 15
     mw = 16  # width of main section (inches) must be div by 4
     fw = 5   # width of the feature plot (inches) must be div by 5
+    grids = 2
 
-    gs = gridspec.GridSpec(h, mw + fw + 1)
     fig = plt.figure(figsize=(mw + fw + 1, 15),
                      facecolor='w',
                      edgecolor='k',
                      dpi=None,
                      frameon=True)
 
-    header = fig.add_subplot(gs[0:1, 0: mw])
-    description = fig.add_subplot(gs[1:4, 0:2 * mw / 4])
-    large_scale = fig.add_subplot(gs[1:4, 2 * mw / 4:3 * mw / 4])
-    small_scale = fig.add_subplot(gs[1:4, 3 * mw / 4:4 * mw / 4])
-    feat_header = fig.add_subplot(gs[0:1, -5:])
-    logo = fig.add_subplot(gs[-1:, -5:])
-    elevation = fig.add_subplot(gs[5, :mw])
-    xsection = fig.add_subplot(gs[6:h - 1, :mw])
-    log = fig.add_subplot(gs[6: h - 1, :mw])
-    potfield = fig.add_subplot(gs[h - 1:, :mw])
+    gs = gridspec.GridSpec(h, mw + fw + 1)
+
+    header = fig.add_subplot(gs[0:1, 0:mw/2])
+    description = fig.add_subplot(gs[1:3, 0:2*mw/4])
+    locmap = fig.add_subplot(gs[0:3, mw/2:mw])  # Aspect = 8:3
+    elevation = fig.add_subplot(gs[3, :mw])
+    xsection = fig.add_subplot(gs[4:h-grids, :mw])
+    potfield = fig.add_subplot(gs[h-grids:, :mw])
+
+    log_header = fig.add_subplot(gs[0:1, -1*fw:])
+    log = fig.add_subplot(gs[6:h-1, :mw])
+    logo = fig.add_subplot(gs[-1:, -1*fw:])
 
     # ------------------------------------------------------------ #
     # Adjust white space between subplots (maybe put in function?)
@@ -147,24 +160,24 @@ def uber_plot(tc):
     description.axis('off')
 
     # --------------------------------------------------------#
-    # Large scale map
+    # Map
     # ---------------------------------------------------------#
     tx, ty = tc.data.coords.xy
 
-    large_scale.plot(tx, ty)
-    large_scale.patch.set_facecolor("0.95")
-    large_scale.patch.set_edgecolor("0.90")
-    large_scale.set_xticks([])
-    large_scale.set_yticks([])
+    locmap.plot(tx, ty)
+    locmap.patch.set_facecolor("0.95")
+    locmap.patch.set_edgecolor("0.90")
+    locmap.set_xticks([])
+    locmap.set_yticks([])
 
     # --------------------------------------------------------#
     # Small scale map
     # ---------------------------------------------------------#
-    small_scale.plot(tx, ty)
-    small_scale.patch.set_facecolor("0.95")
-    small_scale.patch.set_edgecolor("0.90")
-    small_scale.set_xticks([])
-    small_scale.set_yticks([])
+    # small_scale.plot(tx, ty)
+    # small_scale.patch.set_facecolor("0.95")
+    # small_scale.patch.set_edgecolor("0.90")
+    # small_scale.set_xticks([])
+    # small_scale.set_yticks([])
 
     # ------------------------------------------------------------#
     # Seismic cross section
@@ -249,7 +262,7 @@ def uber_plot(tc):
     elevation.text(0.0, .5 * (max_height),
                    "Surface geology",
                    props,
-                   fontsize=30,
+                   fontsize=6,
                    rotation=0)
     elevation.set_frame_on(False)
 
@@ -257,20 +270,20 @@ def uber_plot(tc):
     # Potential field data
     # -----------------------------------------------------------#
     potfield.plot(tc.potfield.coords, tc.potfield.data)
-    potfield.axis("off")
+    #potfield.axis("off")
 
     # -----------------------------------------------------#
     #  Feature plot
     # -----------------------------------------------------#
     if tc.feature_well:
-        feat_header.text(0.0, 1.0,
+        log_header.text(0.0, 1.0,
                          ("Well " + tc.feature_well),
                          verticalalignment='top',
                          horizontalalignment='left',
                          fontsize=14,
                          fontweight='bold'
                          )
-        feat_header.axis("off")
+        log_header.axis("off")
 
         fname = tc.curve_display
 
@@ -533,17 +546,17 @@ def uber_plot(tc):
     # width, height = im.size
 
     # Place in axis:
-    logo.imshow(im, aspect="auto")
+    logo.imshow(im)
     logo.axis('off')
 
     # Place on figure:
     # fig.figimage(im, 0, fig.bbox.ymax - height)
 
-    logo.text(0.1, 0.7,
-              ("Department of Energy \n" +
-               "Nova Scotia, Canada"),
-              verticalalignment='top',
-              horizontalalignment='left')
+    # logo.text(0.1, 0.7,
+    #           ("Department of Energy \n" +
+    #            "Nova Scotia, Canada"),
+    #           verticalalignment='top',
+    #           horizontalalignment='left')
 
     # Horizontal line.
     logo.axhline(y=0.7,

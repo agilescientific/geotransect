@@ -3,7 +3,7 @@
 # Configuration file for geoTransect.py
 
 params:
-    title: Test 
+    title: Transect 1 
     basin: Windsor  # We should get this from the basins shapefile 
     id: 1
     description: This transect is the one we are using to test this module. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
@@ -17,11 +17,17 @@ params:
     seismic_log: GR  # Not currently used
     curve_display: templates/Petrophysics_display_template.csv
 
+locmap:
+    locmap_contents:  # In layer order, top = first
+    - transects/Transects.shp
+    - elevation/DEM_slope.tif
+    - bedrock/p00001gb.shp
+
 data:
-    transect_file: transects2Deliver/Transects.shp
+    transect_file: transects/Transects.shp
     seismic_dir: seismic
     well_dir: wells
-    elevation_file: elevation_raster/NS_DEM_ascii.asc
+    elevation_file: elevation/NS_DEM_ascii.asc
     bedrock_dir: bedrock
     potfield_dir: potfield
     basins_dir: basins  # Not currently used

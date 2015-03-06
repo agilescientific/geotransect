@@ -15,7 +15,7 @@ import os
 
 import yaml
 
-from dataContainers import TransectContainer
+from containers import TransectContainer
 
 
 def main(cfg):
