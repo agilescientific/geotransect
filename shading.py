@@ -10,7 +10,13 @@ http://rnovitsky.blogspot.ca/2010/04/using-hillshade-image-as-intensity.html
 """
 from pylab import gradient, pi, sin, hypot, arctan, arctan2, cos, cm
 
-def set_shade(a, intensity=None, cmap=cm.jet, scale=10.0, azdeg=165.0, altdeg=45.0):
+
+def set_shade(a,
+              intensity=None,
+              cmap=cm.jet,
+              scale=10.0,
+              azdeg=165.0,
+              altdeg=45.0):
     '''
     Sets shading for data array based on intensity layer
     or the data's value itself.
@@ -37,7 +43,8 @@ def set_shade(a, intensity=None, cmap=cm.jet, scale=10.0, azdeg=165.0, altdeg=45
         intensity = hillshade(a, scale=10.0, azdeg=165.0, altdeg=45.0)
     else:
         # or normalize the intensity
-        intensity = (intensity - intensity.min())/(intensity.max() - intensity.min())
+        mi, ma = intensity.min(), intensity.max()
+        intensity = (intensity - mi)/(ma - mi)
     # get rgb of normalized data based on cmap
     rgb = cmap((a-a.min())/float(a.max()-a.min()))[:, :, :3]
     # form an rgb eqvivalent of intensity
@@ -68,6 +75,8 @@ def hillshade(data, scale=10.0, azdeg=165.0, altdeg=45.0):
     dx, dy = gradient(data/float(scale))
     slope = 0.5*pi - arctan(hypot(dx, dy))
     aspect = arctan2(dx, dy)
-    intensity = sin(alt)*sin(slope) + cos(alt)*cos(slope)*cos(-az - aspect - 0.5*pi)
-    intensity = (intensity - intensity.min())/(intensity.max() - intensity.min())
+    az = -az - aspect - 0.5*pi
+    intensity = sin(alt)*sin(slope) + cos(alt)*cos(slope)*cos(az)
+    mi, ma = intensity.min(), intensity.max()
+    intensity = (intensity - mi)/(ma - mi)
     return intensity

@@ -19,27 +19,33 @@ import yaml
 from containers import TransectContainer
 
 
-def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
+class Loader(yaml.Loader):
     """
-    Trick to load YAML as OrderedDict instead of ordinary dict.
+    Overloads pyYAML Loader with ability to include files, and to load
+    everything as an OrderedDict, so the order of params can matter, e.g.
+    for specifying map layer data.
 
-    From http://stackoverflow.com/questions/5121931/
+    From: http://stackoverflow.com/questions/528281
+    and http://stackoverflow.com/questions/5121931
 
-    Copyright: https://github.com/coldfix
-    License: CC-BY-SA
+    Args:
+        stream (YAML stream): A stream from yaml.load()
     """
-    class OrderedLoader(Loader):
-        pass
+    def __init__(self, stream):
+        super(Loader, self).__init__(stream)
+        self._root = os.path.split(stream.name)[0]
+        self.add_constructor('!include', Loader.include)
+        self.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+                             Loader.mapping)
 
-    def construct_mapping(loader, node):
-        loader.flatten_mapping(node)
-        return object_pairs_hook(loader.construct_pairs(node))
+    def include(self, node):
+        filename = os.path.join(self._root, self.construct_scalar(node))
+        with open(filename, 'r') as f:
+            return yaml.load(f, Loader)
 
-    OrderedLoader.add_constructor(
-        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
-        construct_mapping)
-
-    return yaml.load(stream, OrderedLoader)
+    def mapping(self, node):
+        self.flatten_mapping(node)
+        return OrderedDict(self.construct_pairs(node))
 
 
 def complete_paths(dictionary, root):
@@ -64,33 +70,36 @@ def complete_paths(dictionary, root):
     return dictionary
 
 
-def main(cfg):
+def main(ymlfile):
+    """
+    Load a config file, instantiate a TransectContainer, and plot it.
 
-    print "Initializing"
+    Note:
+        Does not return; the plot is a side-effect.
+
+    Args:
+        ymlfile (file): A configuration file in YAML format.
+    """
+
+    with ymlfile as f:
+        cfg = yaml.load(f, Loader)
+
     params = cfg['params']
     root = cfg['params']['data_dir']
     data = complete_paths(cfg['data'], root)
     layers = complete_paths(cfg['map'], root)
     tc = TransectContainer(params, layers, data)
 
-    print "Plotting"
     tc.plot()
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config",
+    parser.add_argument("-c", "--config",
                         metavar="file",
                         type=argparse.FileType('r'),
                         default="config.yaml",
                         help="The name of a YAML config file.",
                         nargs="?")
     c = parser.parse_args()
-
-    print "config file", c.config
-
-    with c.config as ymlfile:
-        config = ordered_load(ymlfile, yaml.SafeLoader)
-
-    main(config)
+    main(c.config)

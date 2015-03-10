@@ -17,7 +17,7 @@ from fiona import crs
 from shapely.geometry import Point, LineString, mapping
 import pyproj as pp
 
-from utils import all_files
+import utils
 
 # Set up logging.
 log = logging.getLogger('lithlog')
@@ -42,8 +42,11 @@ def sgy2shp(input_dir, output_dir, convert=False):
     Extracts trace location from SEGY files and saves it in a
     shape file. A shape file is generated for each SEGY file.
 
-    @param input_dir: Directory containing SEGY files
-    @param output_dir: Directory to save shape files
+    Returns nothing, side effect: writes the shape files.
+
+    Args:
+        input_dir (str): Directory containing SEGY files.
+        output_dir (str): Directory to save shape files.
     """
 
     line_out_file = os.path.join(output_dir, "seismic_lines.shp")
@@ -59,7 +62,7 @@ def sgy2shp(input_dir, output_dir, convert=False):
                     crs=crs.from_epsg(26920),
                     schema=line_schema) as line_out:
 
-        for path in all_files(input_dir, "\\.se?gy$"):
+        for path in utils.walk(input_dir, "\\.se?gy$"):
 
             filebase = os.path.splitext(os.path.basename(path))[0]
 

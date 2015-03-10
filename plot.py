@@ -22,51 +22,7 @@ import pyproj as pp
 
 from autowrap import on_draw
 import utils
-
-
-def get_tops(fname):
-    """
-    Takes a tops_dictionary for plotting in the logs tracks.
-    """
-    tops = {}
-    with open(fname) as f:
-        for line in f.readlines():
-            if not line.startswith('#'):
-                temp = line.strip().split(',')
-                tops[temp[0]] = float(temp[1])
-    return tops
-
-
-def plot_striplog(ax, striplog, width=1,
-                  ladder=False, minthick=1,
-                  alpha=0.75):
-
-    pass
-
-
-def get_curve_params(abbrev, fname):
-    """
-    Builds and returns a dictionary of petrophysical parameters for
-    plotting purposes.
-    """
-    params = {'acronym': abbrev}
-    with open(fname, 'rU') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            if row['acronymn'] == abbrev:
-                params['track'] = int(row['track'])
-                params['units'] = row['units']
-                params['xleft'] = float(row['xleft'])
-                params['xright'] = float(row['xright'])
-                params['logarithmic'] = row['logarithmic']
-                params['hexcolor'] = row['hexcolor']
-                params['fill_left_cond'] = bool(row['fill_left_cond'])
-                params['fill_left'] = row['fill_left']
-                params['fill_right_cond'] = bool(row['fill_right_cond'])
-                params['fill_right'] = row['fill_right']
-                params['xticks'] = row['xticks'].split(',')
-
-    return params
+from feature_plot import plot_feature_well
 
 
 def plot_line(m, line, colour='b', lw=1, alpha=1):
@@ -143,8 +99,45 @@ def draw_basemap(m):
     return m
 
 
+def add_subplot_axes(ax, rect, axisbg='w'):
+    """
+    Facilitates the addition of a small subplot within another plot.
+
+    From: http://stackoverflow.com/users/2309442/pablo
+    License: CC-BY-SA
+
+    Args:
+        ax (axis): A matplotlib axis.
+        rect (list): A rect specifying [left pos, bottom pos, with, height]
+
+    Returns:
+        axis: The sub-axis in the specified position.
+    """
+    fig = plt.gcf()
+    box = ax.get_position()
+    width = box.width
+    height = box.height
+    inax_position = ax.transAxes.transform(rect[0:2])
+    transFigure = fig.transFigure.inverted()
+    infig_position = transFigure.transform(inax_position)
+    x = infig_position[0]
+    y = infig_position[1]
+    width *= rect[2]
+    height *= rect[3]  # <= Typo was here
+    subax = fig.add_axes([x, y, width, height], axisbg=axisbg)
+    x_labelsize = subax.get_xticklabels()[0].get_size()
+    y_labelsize = subax.get_yticklabels()[0].get_size()
+    x_labelsize *= rect[2]**0.5
+    y_labelsize *= rect[3]**0.5
+    subax.xaxis.set_tick_params(labelsize=x_labelsize)
+    subax.yaxis.set_tick_params(labelsize=y_labelsize)
+    return subax
+
+
 def plot(tc):
     """
+    Constructs a multi-subplot matplotlib figure.
+
     Args:
         transect (TransectContainer): A transect container.
     """
@@ -162,6 +155,7 @@ def plot(tc):
 
     gs = gridspec.GridSpec(h, mw + fw + 1)
 
+    # Left-hand column.
     header = fig.add_subplot(gs[0:1, 0:mw/2])
     description = fig.add_subplot(gs[1:3, 0:mw/2])
     locmap = fig.add_subplot(gs[0:3, mw/2:mw])  # Aspect = 8:3
@@ -169,6 +163,7 @@ def plot(tc):
     xsection = fig.add_subplot(gs[4:h-grids, :mw])
     potfield = fig.add_subplot(gs[h-grids:, :mw])
 
+    # Right-hand column.
     log_header = fig.add_subplot(gs[0:1, -1*fw:])
     log = fig.add_subplot(gs[6:h-1, :mw])
     logo = fig.add_subplot(gs[-1:, -1*fw:])
@@ -267,6 +262,41 @@ def plot(tc):
     # small_scale.set_xticks([])
     # small_scale.set_yticks([])
 
+    # ----------------------------------------------------------#
+    # Elevation and bedrock plot
+    # -----------------------------------------------------------#
+    for i, geo in enumerate(tc.bedrock.data[:-1]):
+        lim1 = tc.bedrock.coords[i]
+        lim2 = tc.bedrock.coords[i + 1]
+        idx = np.where(np.logical_and(tc.elevation.coords >= lim1,
+                                      tc.elevation.coords <= lim2))[0]
+        if len(idx) > 1:
+            if idx[-1] < tc.elevation.coords.size - 1:
+                idx = np.append(idx, (idx[-1] + 1))
+        hsv = np.array([[geo["AV_HUE"], geo["AV_SAT"],
+                         geo["AV_VAL"]]]).reshape(1, 1, 3)
+        color = hsv_to_rgb(hsv / 255.)
+        elevation.plot(tc.elevation.coords[idx], tc.elevation.data[idx],
+                       linewidth=3, color=color.flatten())
+
+    max_height = np.amax(tc.elevation.all_data)
+
+    elevation.set_ylim((0, max_height))
+    elevation.set_xlim(tc.extents[:2])
+    elevation.set_yticks([0, int(max_height),
+                          int(np.amax(tc.elevation.data))])
+    elevation.set_xticks([])
+    elevation.tick_params(axis='y', which='major', labelsize=8)
+    elevation.patch.set_alpha(0.1)
+    elevation.set_ylabel("Elevation [m]", fontsize=8)
+    elevation.grid(True)
+    elevation.text(0.0, .5 * (max_height),
+                   "Surface geology",
+                   props,
+                   fontsize=8,
+                   rotation=0)
+    elevation.set_frame_on(False)
+
     # ------------------------------------------------------------#
     # Seismic cross section
     # ------------------------------------------------------------#
@@ -294,6 +324,7 @@ def plot(tc):
     xsection.tick_params(axis='x', which='minor', labelsize=8)
 
     xsection.grid(True)
+    xsection.set_frame_on(False)
 
     # --------------------------------------------------------#
     # Log overlays
@@ -320,315 +351,52 @@ def plot(tc):
 
     log.axis('off')
 
-    # ----------------------------------------------------------#
-    # Elevation and bedrock plot
-    # -----------------------------------------------------------#
-    for i, geo in enumerate(tc.bedrock.data[:-1]):
-        lim1 = tc.bedrock.coords[i]
-        lim2 = tc.bedrock.coords[i + 1]
-        idx = np.where(np.logical_and(tc.elevation.coords >= lim1,
-                                      tc.elevation.coords <= lim2))[0]
-        if idx[-1] < tc.elevation.coords.size - 1:
-            idx = np.append(idx, (idx[-1] + 1))
-        hsv = np.array([[geo["AV_HUE"], geo["AV_SAT"],
-                         geo["AV_VAL"]]]).reshape(1, 1, 3)
-        color = hsv_to_rgb(hsv / 255.)
-        elevation.plot(tc.elevation.coords[idx], tc.elevation.data[idx],
-                       linewidth=3, color=color.flatten())
-
-    max_height = np.amax(tc.elevation.elevation_profile)
-
-    elevation.set_ylim((0, max_height))
-    elevation.set_xlim(tc.extents[:2])
-    elevation.set_yticks([0, int(max_height),
-                          int(np.amax(tc.elevation.data))])
-    elevation.set_xticks([])
-    elevation.tick_params(axis='y', which='major', labelsize=8)
-    elevation.patch.set_alpha(0.1)
-    elevation.set_ylabel("Elevation [m]", fontsize=8)
-    elevation.grid(True)
-    elevation.text(0.0, .5 * (max_height),
-                   "Surface geology",
-                   props,
-                   fontsize=6,
-                   rotation=0)
-    elevation.set_frame_on(False)
-
     # -----------------------------------------------------------#
     # Potential field data
     # -----------------------------------------------------------#
-    potfield.plot(tc.potfield.coords, tc.potfield.data)
-    #potfield.axis("off")
+    for field in tc.potfield.data:
+        potfield.plot(tc.potfield.coords[field], tc.potfield.data[field])
+        potfield.set_xlim(tc.extents[:2])
+        potfield.set_frame_on(False)
+        potfield.set_xticks([])
+        potfield.tick_params(axis='y', which='major', labelsize=8)
+
+
+    # def plot(self, ax):
+
+    #     ax.plot(self.coords, self.data)
+    #     ax.set_yticks([-4, 0, 4])
+    #     ax.set_xticks([])
+
+    #     ax.ylabel("Anomaly [mGal]", fontsize=8)
+    #     ax.tick_params(axis='y', which="major", labelsize=8)
+
+    #     ax.grid(True)
+    #     ax.xlim((self.extents[0], self.extents[1]))
+    #     ax.ylim((-4, 4))
+
+    #     return ax
+
 
     # -----------------------------------------------------#
     #  Feature plot
     # -----------------------------------------------------#
     if tc.feature_well:
         log_header.text(0.0, 1.0,
-                         ("Well " + tc.feature_well),
-                         verticalalignment='top',
-                         horizontalalignment='left',
-                         fontsize=14,
-                         fontweight='bold'
-                         )
+                        ("Well " + tc.feature_well),
+                        verticalalignment='top',
+                        horizontalalignment='left',
+                        fontsize=14,
+                        fontweight='bold'
+                        )
         log_header.axis("off")
 
-        fname = tc.curve_display
-
-        logs = tc.log.get(tc.feature_well)
-
-        Z = logs.data['DEPT']
-        curves = ['GR', 'DT',
-                  'DPHI_SAN',
-                  'NPHI_SAN',
-                  'DTS',
-                  'RT_HRLT',
-                  'RHOB',
-                  'DRHO']
-
-        left = 0.125   # the left side of the subplots of the figure
-        right = 0.9    # the right side of the subplots of the figure
-        bottom = 0.1   # the bottom of the subplots of the figure
-        top = 0.9      # the top of the subplots of the figure
-        wspace = 0.1   # amount of width reserved for blank space between subplots
-        hspace = 0.5   # amount of height reserved for white space between subplots
-
-        window = 51    # window length for smoothing must be an odd integer
-        frac = 0.05
-        ntracks = 5
-        lw = 1.0
-        smooth = True
-        has_striplog = True
-        height = 2.5 * ntracks  # in inches
-        width = 1.5 * ntracks   # in inches
-        fs = 12        # font size for curve labels
-        naxes = 0
-        ncurv_per_track = np.zeros(ntracks)
-
-        if has_striplog:
-            ncurv_per_track[0] = 1
-
-        for curve, values in logs.data.iteritems():
-            naxes += 1
-            params = get_curve_params(curve, fname)
-            ncurv_per_track[params['track']] += 1
-
-        axss = plt.subplot(gs[2:-1, -5])
-        axs0 = [axss, axss.twiny()]
-        axs1 = [plt.subplot(gs[2:-1, -4])]
-        axs2 = [plt.subplot(gs[2:-1, -3])]
-        axs3 = [plt.subplot(gs[2:-1, -2])]
-        axs4 = [plt.subplot(gs[2:-1, -1])]
-
-        axs = [axs0, axs1, axs2, axs3, axs4]
-
-        striplog = tc.striplog.get(tc.feature_well)
-        plot_striplog(axs0[0], striplog, width=5, alpha=0.75,
-                      ladder=True)
-
-        #axs0[0].set_ylim([striplog['bases'][-1], 0])
-
-        # Plot each curve with a white fill to fake the curve fill.
-
-        label_shift = np.zeros(len(axs))
-
-        for curve, values in logs.data.iteritems():
-
-            if curve not in curves:
-                continue
-
-            params = get_curve_params(curve, fname)
-            i = params['track']
-
-            if i == 0:
-                j = 1
-
-            j = 0  # default number of tracks to index into
-
-            # ncurves = ncurv_per_track[i]
-
-            label_shift[i] += 1
-
-            units = '$%s$' % params['units']
-
-            linOrlog = params['logarithmic']
-
-            sxticks = np.array(params['xticks'])
-            xticks = np.array(sxticks, dtype=float)
-            whichticks = 'major'
-
-            if linOrlog == 'log':
-                midline = np.log(np.mean(xticks))
-                xpos = midline
-                whichticks = 'minor'
-            else:
-                midline = np.mean(xticks)
-                xpos = midline
-
-            if smooth:
-                values = utils.rolling_median(values, window)
-
-            if curve == 'GR':
-                j = 1  # second axis in first track
-                label_shift[i] = 1
-
-            # fill_left
-            if params['fill_left_cond']:
-                print params['fill_left_cond']
-                if curve == 'GR':
-                    # do the fill for the lithology track
-                    axs[i][j].fill_betweenx(Z, params['xleft'], values,
-                                            facecolor=params['fill_left'],
-                                            alpha=1.0, zorder=11)
-
-                if curve == 'DPHI_SAN':
-                    # do the fill for the neutron porosity track
-                    nphi = utils.rolling_median(logs.data['NPHI_SAN'], window)
-                    axs[i][j].fill_betweenx(Z,
-                                            nphi,
-                                            values,
-                                            where=nphi >= values,
-                                            facecolor=params['fill_left'],
-                                            alpha=1.0,
-                                            zorder=11)
-
-                    axs[i][j].fill_betweenx(Z,
-                                            nphi,
-                                            values,
-                                            where=nphi <= values,
-                                            facecolor='#8C1717',
-                                            alpha=0.5,
-                                            zorder=12)
-
-            if curve == 'DRHO':
-                blk_drho = 3.2
-                values += blk_drho   # this is a hack to get DRHO on RHOB scale
-                axs[i][j].fill_betweenx(Z,
-                                        blk_drho,
-                                        values,
-                                        where=nphi <= values,
-                                        facecolor='#CCCCCC',
-                                        alpha=0.5,
-                                        zorder=12)
-
-            # fill right
-            if params['fill_right_cond']:
-
-                axs[i][j].fill_betweenx(Z, values, params['xright'],
-                                        facecolor=params['fill_right'],
-                                        alpha=1.0, zorder=12)
-
-            # plot curve
-            axs[i][j].plot(values, Z, color=params['hexcolor'],
-                           lw=lw, zorder=13)
-
-            # set scale of curve
-            axs[i][j].set_xlim([params['xleft'], params['xright']])
-
-            # ------------------------------------------------- #
-            # curve label
-            # ------------------------------------------------- #
-
-            trans = transforms.blended_transform_factory(axs[i][j].transData,
-                                                         axs[i][j].transData)
-
-            axs[i][j].text(xpos, -130 - 40 * (label_shift[i] - 1),
-                           curve,
-                           horizontalalignment='center',
-                           verticalalignment='bottom',
-                           fontsize=12, color=params['hexcolor'],
-                           transform=trans)
-            # curve units
-            if label_shift[i] <= 1:
-                axs[i][j].text(xpos, -110, units,
-                               horizontalalignment='center',
-                               verticalalignment='top',
-                               fontsize=12, color='k',
-                               transform=trans)
-
-            axs[i][j].set_xscale(linOrlog)
-
-            axs[i][j].set_ylim([striplog['bases'][-1], 0])
-
-            # set the x-tick positions and tick labels
-            axs[i][j].axes.xaxis.set_ticks(xticks)
-            axs[i][j].axes.xaxis.set_ticklabels(sxticks, fontsize=8)
-
-            for label in axs[i][j].axes.xaxis.get_ticklabels():
-                label.set_rotation(90)
-
-            axs[i][j].tick_params(axis='x', direction='out')
-
-            axs[i][j].xaxis.tick_top()
-            axs[i][j].xaxis.set_label_position('top')
-
-            axs[i][j].xaxis.grid(True, which=whichticks,
-                                 linewidth=0.25, linestyle='-',
-                                 color='0.75', zorder=100)
-
-            axs[i][j].yaxis.grid(True, which=whichticks,
-                                 linewidth=0.25, linestyle='-',
-                                 color='0.75', zorder=100)
-
-            axs[i][j].yaxis.set_ticks(np.arange(0, max(Z), 100))
-
-            if i != 0:
-                    axs[i][j].set_yticklabels("")
-
-        # END of curve 'for' loop
-
-        # add Depth label
-
-        axs[0][0].text(-0.25, 50, 'MD \n $m$ ', fontsize='10',
-                       horizontalalignment='left',
-                       verticalalignment='center')
-
-        axs[0][0].axes.yaxis.get_ticklabels()
-        axs[0][0].axes.xaxis.set_ticklabels('')
-
-        for label in axs[0][0].axes.yaxis.get_ticklabels():
-                label.set_rotation(90)
-                label.set_fontsize(10)
-
-        for label in axs[1][0].axes.xaxis.get_ticklabels():
-            label.set_rotation(90)
-            label.set_fontsize(10)
-
-        tops_fname = os.path.join(tc.data_dir,
-                                  tc.tops_file)
-        tops = get_tops(tops_fname)
-
-        topx = get_curve_params('DT', fname)
-
-        topmidpt = np.amax((topx)['xright'])
-
-        # plot tops
-        for i in range(ntracks):
-
-            for mkr, depth in tops.iteritems():
-
-                # draw horizontal bars at the top position
-                axs[i][-1].axhline(y=depth,
-                                   xmin=0.01, xmax=.99,
-                                   color='b', lw=2,
-                                   alpha=0.5,
-                                   zorder=100)
-
-                # draw text box at the right edge of the last track
-                axs[-1][-1].text(x=topmidpt, y=depth, s=mkr,
-                                 alpha=0.5, color='k',
-                                 fontsize='8',
-                                 horizontalalignment='center',
-                                 verticalalignment='center',
-                                 zorder=10000,
-                                 bbox=dict(facecolor='white', edgecolor='k',
-                                           alpha=0.25, lw=0.25),
-                                 weight='light')
+        plot_feature_well(log)
 
     # --------------------------------------------------------------#
     # Logo
     # --------------------------------------------------------------#
-    path = os.path.join(tc.data_dir, tc.images_dir, 'logo.png')
+    path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
     im = Image.open(path)
     im = np.array(im).astype(np.float) / 255
     # width, height = im.size

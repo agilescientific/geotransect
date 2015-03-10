@@ -3,22 +3,19 @@
 # Configuration file for geotransect.py
 
 # Params are passed directly to the TransectContainer object, and all of the
-# Containers it contains. So you have access to them everywhere. 
+# Containers it contains, so you have access to them everywhere. 
 params:
-    title: Transect 2 
+    title: Transect 1 
     basin: Windsor  # We should get this from the basins shapefile 
-    id: 2
+    id: 1
     description: This transect is the one we are using to test this module. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-    domain: depth  # Not currently used
-    buffer: 300
     depth:
         - 0
         - 3000
     data_dir: /Users/matt/Dropbox/geotransect_test/data
-    images_dir: images
     feature_well: # P-129
     seismic_log: GR  # Not currently used
-    curve_display: templates/Petrophysics_display_template.csv
+    settings: !include settings.yaml
 
 # Data strings are always interpreted as paths relative to data_dir in params.
 # They are passed to specific data containers. If we need a specific GIS layer,
@@ -27,6 +24,7 @@ params:
 data:
     transect_file: transects/Transects.shp
     seismic_dir: seismic
+    velocity_file: velocity/tdr_wells.xls
     well_dir: wells
     elevation_file: elevation/NS_DEM_ascii.asc
     bedrock_dir: bedrock

@@ -1,0 +1,12 @@
+# Settings are things that don't change very often. They are passed directly
+# to the TransectContainer object, and all of the Containers it contains, so
+# you have access to them everywhere. These items are available as follows:
+#    tc.settings['domain']
+# etc. The dictionary is an OrderedDict, so order is preserved everywhere.
+images_dir: images
+raster_extensions:
+    - tif
+    - grd
+domain: depth  # Not currently used
+buffer: 1000
+curve_display: templates/Petrophysics_display_template.csv

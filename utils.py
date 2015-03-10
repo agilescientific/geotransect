@@ -15,9 +15,34 @@ import pyproj as pp
 from shapely.ops import transform
 
 
-def all_files(directory, match=None):
+def listdir(directory, match=None):
     """
-    Find files whose names match some regex.
+    Wrapper for `os.listdir()` that returns full paths. A bit like
+    `utils.walk()` but not recursive. Case insensitive.
+
+    Args:
+        directory (str): The directory to list.
+
+    Yields:
+        str: Full path to each file in turn.
+    """
+    for f in os.listdir(directory):
+        if match:
+            if not re.search(match, f, flags=re.IGNORECASE):
+                continue
+        yield os.path.join(directory, f)
+
+
+def walk(directory, match=None):
+    """
+    Find files whose names match some regex. Like `fnmatch` but with regex.
+    Like `utils.listdir()` but recursive. Case insensitive.
+
+    Args:
+        directory (str): The directory to start at.
+
+    Yields:
+        str: Full path to each file in turn.
     """
     for path, dirs, files in os.walk(directory):
         for f in files:
