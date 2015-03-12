@@ -74,10 +74,16 @@ class TransectContainer(BaseContainer):
         data (dict): Contains the shape files for the various sub-containers.
         layers (dict): Contains the shape files for the map.
     """
-    def __init__(self, params, layers, data):
+    def __init__(self, **kwargs):
 
         print "Welcome to geotransect!"
         print "+++++++++++++++++++++++++++++++++\nInitializing"
+
+        # Could do this dynamically.
+        params = kwargs.get('params')
+        layers = kwargs.get('layers')
+        potfields = kwargs.get('potfields')
+        data = kwargs.get('data')
 
         super(TransectContainer, self).__init__(params)
 
@@ -109,7 +115,8 @@ class TransectContainer(BaseContainer):
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
         self.striplog = StriplogContainer(data['striplog_dir'], params)
-        self.potfield = PotfieldContainer(data['potfield_dir'], params)
+        # self.potfield = PotfieldContainer(data['potfield_dir'], params)
+        self.potfield = PotfieldContainer(potfields, params)
         self.locmap = LocmapContainer(layers, params)
 
     def plot(self):
@@ -171,7 +178,7 @@ class LocmapContainer(BaseContainer):
         """
         print "\nUpdating", self.__class__.__name__
 
-        pad = 5000      # m ... interior padding for map box
+        pad = self.settings['map_padding']
         aspect = 12/3.  # I was expecting it to be 8:3.
 
         # Calculate the map bounds and centre.
@@ -196,20 +203,27 @@ class LocmapContainer(BaseContainer):
 
         # Go over the layers and collect data.
         for layer, details in self.layers.items():
-            fname = details['file']
-            print layer, fname
+            path = details['file']
+            print layer, path
 
-            # Deal with shapefiles.
+            # Set up convenient params dictionary for plotting function.
+            params = {k: v for k, v in details.items() if k != 'file'}
+            self.layers[layer]['params'] = params
+
+            # Get a list of shapes from the file.
             shapes, names = [], []
-            if fname.endswith(".shp"):
-                with fiona.open(fname) as c:
+            fname, ext = os.path.splitext(os.path.basename(path))
+            if ext.strip('.').lower() in self.settings['raster_extensions']:
+                # TODO: Deal with rasters.
+                pass
+            elif ext.strip('.').lower() == 'shp':
+                with fiona.open(path) as c:
                     for s in c:
                         shapes.append(shape(s['geometry']))
                         # TODO: names.append(s['name'] or s['id'])
-            setattr(self, layer, shapes)
-
-            # TODO: Deal with rasters.
-            pass
+                setattr(self, layer, shapes)
+            else:
+                pass
 
 
 class ElevationContainer(BaseContainer):
@@ -425,56 +439,35 @@ class SeismicContainer(BaseContainer):
 
 class PotfieldContainer(BaseContainer):
     """
-    Contains random data for placeholders.
+    Contains potential field data.
     """
-    def __init__(self, potfield_dir, params):
+    def __init__(self, potfields, params):
         super(PotfieldContainer, self).__init__(params)
 
-        self.all_data = {}
-        self.all_coords = {}
-
         self.data = {}
-        self.coords = {}
 
-        decimate = 1
+        for name, params in potfields.items():
 
-        exts = self.settings['raster_extensions']
-        regex = ".+\\." + "$|.+\\.".join(exts) + "$"
+            # Populate these now.
+            all_data = {}
+            all_coords = {}
 
-        for f in utils.listdir(potfield_dir, regex):
-            name, ext = os.path.splitext(os.path.basename(f))
-            with rasterio.drivers(CPL_DEBUG=True):
-                with rasterio.open(f) as src:
-                    data = src.read()[0,
-                                      0:-1:decimate,
-                                      0:-1:decimate
-                                      ]
+            all_data, all_coords = self.__get_all_data(params)
 
-                    # Clip the data to deal with outliers
-                    vmin = np.percentile(data, 2)
-                    vmax = np.percentile(data, 98)
-                    data[data > vmax] = vmax
-                    data[data < vmin] = vmin
+            c_def = self.settings['default_colour']
 
-                    self.all_data[name] = data
+            cif = params['colour_is_file']
+            if cif:
+                all_colour = self.__get_all_data(params, colour=True)[0]
+            else:
+                all_colour = params.get('colour', c_def)
 
-                    # Get as lat/lon using the affine coordinate transform
-                    # TODO - do this with proj? Why go via lo/la?
-                    y = np.arange(self.all_data[name].shape[1])
-                    x = np.arange(self.all_data[name].shape[0])
-                    y = y * src.affine[0]*decimate + src.affine[2]
-                    x = x * src.affine[4]*decimate + src.affine[5]
-                    wgs_grid = np.meshgrid(y, x)
+            payload = {'all_data': all_data,
+                       'all_coords': all_coords,
+                       'all_colour': all_colour,
+                       'colour_is_file': cif}
 
-                    # TODO move to config
-                    ll_wgs84 = pp.Proj("+init=EPSG:4269")
-                    utm_nad83 = pp.Proj("+init=EPSG:26920")
-
-                    self.all_coords[name] = pp.transform(utm_nad83,
-                                                         utm_nad83,
-                                                         wgs_grid[0],
-                                                         wgs_grid[1]
-                                                         )
+            self.data[name] = payload
 
     def update(self, transect):
         """
@@ -488,18 +481,68 @@ class PotfieldContainer(BaseContainer):
         """
         print "\nUpdating", self.__class__.__name__
 
-        print "Found rasters", self.all_data.keys()
+        print "Found rasters", self.data.keys()
 
-        for k, data in self.all_data.items():
-            self.coords[k] = self.linspace
-            self.data[k] = np.zeros_like(self.linspace)
+        for name, payload in self.data.items():
+            payload['coords'] = self.linspace
+            payload['data'] = np.zeros_like(self.linspace)
+            if payload['colour_is_file']:
+                payload['colour'] = np.zeros_like(self.linspace)
+            else:
+                payload['colour'] = payload['all_colour']
+
             for i in self.linspace:
                 i = int(i)
                 x, y = transect.interpolate(i).xy
-                xi = np.abs(self.all_coords[k][0][0, :] - x).argmin()
-                yi = np.abs(self.all_coords[k][1][:, 0] - y).argmin()
+                xi = np.abs(payload['all_coords'][0][0, :] - x).argmin()
+                yi = np.abs(payload['all_coords'][1][:, 0] - y).argmin()
 
-                self.data[k][i] = data[yi, xi]
+                payload['data'][i] = payload['all_data'][yi, xi]
+                if payload['colour_is_file']:
+                    payload['colour'][i] = payload['all_colour'][yi, xi]
+
+            self.data[name] = payload
+
+    def __get_all_data(self, params, colour=False):
+        with rasterio.drivers(CPL_DEBUG=True):
+
+            if colour:
+                f = params['colour']
+            else:
+                f = params['file']
+
+            with rasterio.open(f) as src:
+
+                # Read and decimate the data.
+                decimate = params.get('decimate', 1)
+                all_data = src.read()[0,
+                                      0:-1:decimate,
+                                      0:-1:decimate
+                                      ]
+
+                # Clip the data to deal with outliers
+                perc = params.get('clip', 100)
+                vmin = np.percentile(all_data, 100-perc)
+                vmax = np.percentile(all_data, perc)
+                all_data[all_data > vmax] = vmax
+                all_data[all_data < vmin] = vmin
+
+                # Get as lat/lon using the affine coordinate transform
+                # TODO - do this with proj?
+                y = np.arange(all_data.shape[1])
+                x = np.arange(all_data.shape[0])
+                y = y * src.affine[0]*decimate + src.affine[2]
+                x = x * src.affine[4]*decimate + src.affine[5]
+                wgs_grid = np.meshgrid(y, x)
+
+                utm_nad83 = pp.Proj("+init=EPSG:26920")
+
+                all_coords = pp.transform(utm_nad83,
+                                          utm_nad83,
+                                          wgs_grid[0],
+                                          wgs_grid[1]
+                                          )
+        return all_data, all_coords
 
 
 class LogContainer(BaseContainer):

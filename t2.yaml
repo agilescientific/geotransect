@@ -29,28 +29,39 @@ data:
     well_dir: wells
     elevation_file: elevation/NS_DEM_ascii.asc
     bedrock_dir: bedrock
-    potfield_dir: potfield
     basins_dir: basins  # Not currently used
     striplog_dir: wells
     tops_file: wells/P-129/tops/P-129_tops.txt  # Need to make this dynamic, or just handle in well
 
-map:  # In layer order, top = first
+potfields:
+    Bouger:
+        file: potfield/r154nsboug.grd
+        colour: potfield/canada200m_rtf_may2014_UTM.GRD
+        scale:
+            - 0
+            - -20
+    Canada_200m:
+        file: potfield/canada200m_rtf_may2014_UTM.GRD
+        colour: red
+        clip: 99
+        decimate: 1
+
+# TODO: Only use one level of nesting
+map_layers:  # In layer order, top = first
     transects:
         file: transects/Transects.shp
-        params:
-            colour: blue
-            alpha: 0.67
+        colour: blue
+        alpha: 0.67
     wells:
         file: wells/wells.shp
-        params:
-            colour: blue
-            alpha: 0.67
+        colour: blue
+        alpha: 0.67
     seismic:
         file: seismic/seismic_lines.shp
-        params:
-            colour: black
-            alpha: 0.33
+        colour: black
+        alpha: 0.33
     #shade:
     #    file: elevation/DEM_slope.tif
     #bedrock:
+    # TODO: Deal with plotting polygons.
     #    file: bedrock/p00001gb.shp

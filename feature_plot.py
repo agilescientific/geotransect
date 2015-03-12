@@ -96,22 +96,11 @@ def plot_feature_well(tc, gs):
               'RHOB',
               'DRHO']
 
-    left = 0.125   # the left side of the subplots of the figure
-    right = 0.9    # the right side of the subplots of the figure
-    bottom = 0.1   # the bottom of the subplots of the figure
-    top = 0.9      # the top of the subplots of the figure
-    wspace = 0.1   # width reserved for blank space between subplots
-    hspace = 0.5   # height reserved for white space between subplots
-
     window = 51    # window length for smoothing must be an odd integer
-    frac = 0.05
     ntracks = 5
     lw = 1.0
     smooth = True
     has_striplog = True
-    height = 2.5 * ntracks  # in inches
-    width = 1.5 * ntracks   # in inches
-    fs = 12        # font size for curve labels
     naxes = 0
     ncurv_per_track = np.zeros(ntracks)
 
@@ -122,6 +111,8 @@ def plot_feature_well(tc, gs):
         naxes += 1
         params = get_curve_params(curve, fname)
         ncurv_per_track[params['track']] += 1
+
+    gs.update(wspace=0)
 
     axss = plt.subplot(gs[2:-1, -5])
     axs0 = [axss, axss.twiny()]

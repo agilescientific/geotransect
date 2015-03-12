@@ -6,6 +6,10 @@
 images_dir: images
 raster_extensions:
     - tif
+    - tiff
     - grd
+    - asc
 buffer: 1000
+map_padding: 10000
+default_colour: blue
 curve_display: templates/Petrophysics_display_template.csv

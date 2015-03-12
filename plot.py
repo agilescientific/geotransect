@@ -175,10 +175,10 @@ def plot(tc):
     # ------------------------------------------------------------ #
     left = 0.05     # left side of the subplots of the figure
     right = 0.95    # right side of the subplots of the figure
-    bottom = 0.1   # bottom of the subplots of the figure
-    top = 0.9      # top of the subplots of the figure
-    wspace = 0.1   # width reserved for blank space between subplots
-    hspace = 0.05   # height reserved for white space between subplots
+    bottom = 0.05   # bottom of the subplots of the figure
+    top = 0.95      # top of the subplots of the figure
+    wspace = 0.05   # blank w space between subplots
+    hspace = 0.1   # blank h space between subplots
 
     fig.subplots_adjust(left, bottom, right, top, wspace, hspace)
 
@@ -375,14 +375,17 @@ def plot(tc):
 
     # Potential field data
     # -----------------------------------------------------------#
-    colours = ['b', 'r', 'g', 'orange', 'cyan', 'magenta', 'k']
-    for i, (field, data) in enumerate(tc.potfield.data.items()):
+    for i, (field, payload) in enumerate(tc.potfield.data.items()):
         bot = 1 - (i+1.)/n_grids
         height = (1./n_grids) - 0.05
         rect = [0, bot, 1, height]
         this_ax = add_subplot_axes(potfield, rect)
-        c = colours[i]
-        this_ax.scatter(tc.potfield.coords[field],
+
+        c = payload['colour']
+        data = payload['data']
+        coords = payload['coords']
+
+        this_ax.scatter(coords,
                         data,
                         color=c,
                         s=1,
@@ -397,6 +400,7 @@ def plot(tc):
                      va='top',
                      fontsize=10,
                      color='k')
+
     potfield.set_frame_on(False)
     potfield.set_xticks([])
     potfield.set_yticks([])

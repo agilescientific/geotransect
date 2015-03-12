@@ -70,6 +70,26 @@ def complete_paths(dictionary, root):
     return dictionary
 
 
+def complete_pot_paths(dictionary, root):
+    """
+    The map dictionary is a bit more complicated.
+
+    Args:
+        dictionary (dict): A dict of relative file names or directories.
+        root (str): The absolute path to the relative paths in `dictionary`.
+    """
+    for k, v in dictionary.items():
+        dictionary[k]['file'] = os.path.join(root, v['file'])
+        if dictionary[k].get('colour'):
+            fname = os.path.join(root, v['colour'])
+            if os.path.isfile(fname):
+                dictionary[k]['colour'] = fname
+                dictionary[k]['colour_is_file'] = True
+            else:
+                dictionary[k]['colour_is_file'] = False
+    return dictionary
+
+
 def complete_map_paths(dictionary, root):
     """
     The map dictionary is a bit more complicated.
@@ -97,11 +117,14 @@ def main(ymlfile):
     with ymlfile as f:
         cfg = yaml.load(f, Loader)
 
-    params = cfg['params']
+    kwargs = {}
+    kwargs['params'] = cfg['params']
     root = cfg['params']['data_dir']
-    data = complete_paths(cfg['data'], root)
-    layers = complete_map_paths(cfg['map'], root)
-    tc = TransectContainer(params, layers, data)
+    kwargs['data'] = complete_paths(cfg['data'], root)
+    kwargs['layers'] = complete_map_paths(cfg['map_layers'], root)
+    kwargs['potfields'] = complete_pot_paths(cfg['potfields'], root)
+
+    tc = TransectContainer(**kwargs)
 
     tc.plot()
 
