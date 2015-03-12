@@ -7,6 +7,5 @@ images_dir: images
 raster_extensions:
     - tif
     - grd
-domain: depth  # Not currently used
 buffer: 1000
 curve_display: templates/Petrophysics_display_template.csv

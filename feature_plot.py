@@ -71,7 +71,7 @@ def plot_striplog(ax, striplog, width=1,
     pass
 
 
-def plot_feature_well(tc, log, gs):
+def plot_feature_well(tc, gs):
     """
     Plotting function for the feature well.
 
@@ -118,7 +118,7 @@ def plot_feature_well(tc, log, gs):
     if has_striplog:
         ncurv_per_track[0] = 1
 
-    for curve, values in logs.data.iteritems():
+    for curve in curves:
         naxes += 1
         params = get_curve_params(curve, fname)
         ncurv_per_track[params['track']] += 1
@@ -132,30 +132,19 @@ def plot_feature_well(tc, log, gs):
 
     axs = [axs0, axs1, axs2, axs3, axs4]
 
-    striplog = tc.striplog.get(tc.feature_well)
-    plot_striplog(axs0[0], striplog, width=5, alpha=0.75,
-                  ladder=True)
+    #striplog = tc.striplog.get(tc.feature_well)
+    #plot_striplog(axs0[0], striplog, width=5, alpha=0.75,
+    #             ladder=True)
 
-    # axs0[0].set_ylim([striplog['bases'][-1], 0])
-
-    # Plot each curve with a white fill to fake the curve fill.
-
+    axs0[0].set_ylim([Z[-1], 0])
     label_shift = np.zeros(len(axs))
 
-    for curve, values in logs.data.iteritems():
-
-        if curve not in curves:
-            continue
-
+    for curve in curves:
+        values = logs.data[curve]
         params = get_curve_params(curve, fname)
         i = params['track']
 
-        if i == 0:
-            j = 1
-
-        j = 0  # default number of tracks to index into
-
-        # ncurves = ncurv_per_track[i]
+        j = 0
 
         label_shift[i] += 1
 
@@ -181,34 +170,30 @@ def plot_feature_well(tc, log, gs):
         if curve == 'GR':
             j = 1  # second axis in first track
             label_shift[i] = 1
-
-        # fill_left
-        if params['fill_left_cond']:
-            print params['fill_left_cond']
-            if curve == 'GR':
+            if params['fill_left_cond']:
                 # do the fill for the lithology track
                 axs[i][j].fill_betweenx(Z, params['xleft'], values,
                                         facecolor=params['fill_left'],
                                         alpha=1.0, zorder=11)
 
-            if curve == 'DPHI_SAN':
-                # do the fill for the neutron porosity track
-                nphi = utils.rolling_median(logs.data['NPHI_SAN'], window)
-                axs[i][j].fill_betweenx(Z,
-                                        nphi,
-                                        values,
-                                        where=nphi >= values,
-                                        facecolor=params['fill_left'],
-                                        alpha=1.0,
-                                        zorder=11)
+        if (curve == 'DPHI_SAN') and params['fill_left_cond']:
+            # do the fill for the neutron porosity track
+            nphi = utils.rolling_median(logs.data['NPHI_SAN'], window)
+            axs[i][j].fill_betweenx(Z,
+                                    nphi,
+                                    values,
+                                    where=nphi >= values,
+                                    facecolor=params['fill_left'],
+                                    alpha=1.0,
+                                    zorder=11)
 
-                axs[i][j].fill_betweenx(Z,
-                                        nphi,
-                                        values,
-                                        where=nphi <= values,
-                                        facecolor='#8C1717',
-                                        alpha=0.5,
-                                        zorder=12)
+            axs[i][j].fill_betweenx(Z,
+                                    nphi,
+                                    values,
+                                    where=nphi <= values,
+                                    facecolor='#8C1717',
+                                    alpha=0.5,
+                                    zorder=12)
 
         if curve == 'DRHO':
             blk_drho = 3.2
@@ -236,13 +221,13 @@ def plot_feature_well(tc, log, gs):
         axs[i][j].set_xlim([params['xleft'], params['xright']])
 
         # ------------------------------------------------- #
-        # curve label
+        # curve labels
         # ------------------------------------------------- #
 
         trans = transforms.blended_transform_factory(axs[i][j].transData,
                                                      axs[i][j].transData)
 
-        axs[i][j].text(xpos, -130 - 40 * (label_shift[i] - 1),
+        axs[i][j].text(xpos, -130 - 40*(label_shift[i]-1),
                        curve,
                        horizontalalignment='center',
                        verticalalignment='bottom',
@@ -250,28 +235,26 @@ def plot_feature_well(tc, log, gs):
                        transform=trans)
         # curve units
         if label_shift[i] <= 1:
-            axs[i][j].text(xpos, -110, units,
+            axs[i][j].text(xpos, -110,
+                           units,
                            horizontalalignment='center',
                            verticalalignment='top',
                            fontsize=12, color='k',
                            transform=trans)
 
+        # ------------------------------------------------- #
+        # scales and tickmarks
+        # ------------------------------------------------- #
+
         axs[i][j].set_xscale(linOrlog)
-
-        axs[i][j].set_ylim([striplog['bases'][-1], 0])
-
-        # set the x-tick positions and tick labels
+        axs[i][j].set_ylim([Z[-1], 0])
         axs[i][j].axes.xaxis.set_ticks(xticks)
         axs[i][j].axes.xaxis.set_ticklabels(sxticks, fontsize=8)
-
         for label in axs[i][j].axes.xaxis.get_ticklabels():
             label.set_rotation(90)
-
         axs[i][j].tick_params(axis='x', direction='out')
-
         axs[i][j].xaxis.tick_top()
         axs[i][j].xaxis.set_label_position('top')
-
         axs[i][j].xaxis.grid(True, which=whichticks,
                              linewidth=0.25, linestyle='-',
                              color='0.75', zorder=100)
@@ -279,16 +262,15 @@ def plot_feature_well(tc, log, gs):
         axs[i][j].yaxis.grid(True, which=whichticks,
                              linewidth=0.25, linestyle='-',
                              color='0.75', zorder=100)
-
         axs[i][j].yaxis.set_ticks(np.arange(0, max(Z), 100))
-
         if i != 0:
                 axs[i][j].set_yticklabels("")
 
-    # END of curve 'for' loop
+    # ------------------------------------------------- #
+    # End of curve loop
+    # ------------------------------------------------- #
 
-    # add Depth label
-
+    # Add Depth label
     axs[0][0].text(-0.25, 50, 'MD \n $m$ ', fontsize='10',
                    horizontalalignment='left',
                    verticalalignment='center')
@@ -307,9 +289,7 @@ def plot_feature_well(tc, log, gs):
     tops_fname = os.path.join(tc.data_dir,
                               tc.tops_file)
     tops = get_tops(tops_fname)
-
     topx = get_curve_params('DT', fname)
-
     topmidpt = np.amax((topx)['xright'])
 
     # plot tops
@@ -334,5 +314,3 @@ def plot_feature_well(tc, log, gs):
                              bbox=dict(facecolor='white', edgecolor='k',
                                        alpha=0.25, lw=0.25),
                              weight='light')
-
-    return log

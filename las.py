@@ -1,14 +1,17 @@
-"""LAS File Reader
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+LAS File Reader
 
 The main class defined here is LASReader, a class that reads a LAS file
 and makes the data available as a Python object.
 """
 
-# Slowly updating to LAS 3.0
-# Copyright (c) 2015, Matt Hall, Agile Geoscience
-#
 # Original code
 # Copyright (c) 2011, Warren Weckesser
+#
+# Slowly updating to LAS 3.0
+# Copyright (c) 2015, Agile Geoscience
 #
 # Licensed under the terms of the ISC License
 # http://www.isc.org/downloads/software-support-policy/isc-license/
@@ -25,28 +28,16 @@ and makes the data available as a Python object.
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-
 import re
 import keyword
 
 import numpy as np
 
 
-def isidentifier(s):
+def is_identifier(s):
     if s in keyword.kwlist:
         return False
     return re.match(r'^[a-z_][a-z0-9_]*$', s, re.I) is not None
-
-
-def _convert_to_value(s):
-    try:
-        value = int(s)
-    except ValueError:
-        try:
-            value = float(s)
-        except ValueError:
-            value = s
-    return value
 
 
 class LASError(Exception):
@@ -54,7 +45,8 @@ class LASError(Exception):
 
 
 class LASItem(object):
-    """This class is just a namespace, holding the attributes 'name',
+    """
+    This class is just a namespace, holding the attributes 'name',
     'units', 'data', 'value', and 'descr'.  'value' is the numerical
     value of 'data', if it has a numerical value (specifically, if
     int() or float() don't raise an exception when given the value
@@ -67,17 +59,27 @@ class LASItem(object):
         self.name = name
         self.units = units
         self.data = data
-        self.value = _convert_to_value(data)
+        self.value = self.__convert_to_value(data)
         self.descr = descr
-
-    def __str__(self):
-        s = ("name='%s', units='%s', data='%s', descr='%s'" %
-                (self.name, self.units, self.data, self.descr))
-        return s
 
     def __repr__(self):
         s = str(self)
         return "LASItem(%s)" % s
+
+    def __str__(self):
+        s = ("name='%s', units='%s', data='%s', descr='%s'" %
+             (self.name, self.units, self.data, self.descr))
+        return s
+
+    def __convert_to_value(self, s):
+        try:
+            value = int(s)
+        except ValueError:
+            try:
+                value = float(s)
+            except ValueError:
+                value = s
+        return value
 
     @classmethod
     def from_line(cls, line):
@@ -100,37 +102,9 @@ class LASItem(object):
                        descr=descr.strip())
 
 
-def _read_wrapped_row(f, n):
-    """Read a "row" of data from the Ascii section of a "wrapped" LAS file.
-
-    `f` must be a file object opened for reading.
-    `n` is the number of fields in the row.
-
-    Returns the list of floats read from the file.
-    """
-    depth = float(f.readline().strip(r', \t'))
-    values = [depth]
-    while len(values) < n:
-        new_values = [float(s.strip(r', \t')) for s in f.readline().split()]
-        values.extend(new_values)
-    return values
-
-
-def _read_wrapped_data(f, dt):
-    data = []
-    ncols = len(dt.names)
-    while True:
-        try:
-            row = _read_wrapped_row(f, ncols)
-        except Exception:
-            break
-        data.append(tuple(row))
-    data = np.array(data, dtype=dt)
-    return data
-
-
 class LASSection(object):
-    """Represents a "section" of a LAS file.
+    """
+    Represents a "section" of a LAS file.
 
     A section is basically a collection of items, where each item has the
     attributes 'name', 'units', 'data' and 'descr'.
@@ -162,7 +136,7 @@ class LASSection(object):
     def add_item(self, item):
         self.items[item.name] = item
         self.names.append(item.name)
-        if isidentifier(item.name) and not hasattr(self, item.name):
+        if is_identifier(item.name) and not hasattr(self, item.name):
             setattr(self, item.name, item)
 
     def display(self):
@@ -176,7 +150,8 @@ class LASSection(object):
 
 
 class LASReader(object):
-    """The LASReader class holds data from a LAS file.
+    """
+    The LASReader class holds data from a LAS file.
 
     This reader only handles LAS 2.0 files (as far as I know).
 
@@ -264,7 +239,8 @@ class LASReader(object):
     """
 
     def __init__(self, f, null_subs=None, unknown_as_other=False):
-        """f can be a filename (str) or a file object.
+        """
+        f can be a filename (str) or a file object.
 
         If 'null_subs' is not None, its value replaces any values in the data
         that matches the NULL value specified in the Version section of the LAS
@@ -292,7 +268,7 @@ class LASReader(object):
         self.other = ''
         self.data = None
 
-        self._read_las(f, unknown_as_other)
+        self.__read_las(f, unknown_as_other)
 
         if self.data is not None:
             c = len(self.curves.items)
@@ -300,16 +276,46 @@ class LASReader(object):
             if null_subs is not None:
                 self.data2d[self.data2d == self.null] = null_subs
 
-    def _read_las(self, f, unknown_as_other):
-        """Read a LAS file.
+    def __read_wrapped_row(self, f, n):
+        """
+        Read a "row" of data from the Ascii section of a "wrapped" LAS file.
+
+        `f` must be a file object opened for reading.
+        `n` is the number of fields in the row.
+
+        Returns the list of floats read from the file.
+        """
+        depth = float(f.readline().strip(r', \t'))
+        values = [depth]
+        while len(values) < n:
+            new_vals = [float(s.strip(r', \t')) for s in f.readline().split()]
+            values.extend(new_vals)
+        return values
+
+    def __read_wrapped_data(self, f, dt):
+        data = []
+        ncols = len(dt.names)
+        while True:
+            try:
+                row = self.__read_wrapped_row(f, ncols)
+            except Exception:
+                break
+            data.append(tuple(row))
+        data = np.array(data, dtype=dt)
+        return data
+
+    def __read_las(self, f, unknown_as_other):
+        """
+        Read an LAS file.
 
         Returns a dictionary with keys 'V', 'W', 'C', 'P', 'O' and 'A',
         corresponding to the sections of a LAS file.  The values associated
         with keys 'V', 'W', 'C' and 'P' will be lists of Item instances.  The
-        value associated with the 'O' key is a list of strings.  The value
-        associated with the 'A' key is a numpy structured array containing the
-        log data.  The field names of the array are the mnemonics from the
-        Curve section of the file.
+        value associated with the 'O' key is a string.
+
+        The value associated with the 'A' key is a numpy structured array
+        containing the log data.  The field names of the array are the
+        mnemonics from the Curve section of the file.
         """
 
         # Allowed Column Data delimiters (DLM)s from Appendix II of
@@ -326,7 +332,7 @@ class LASReader(object):
         line = f.readline()
         current_section = None
         current_section_label = ''
-        while line and not line.startswith('~A'):  # Data: see below this while.
+        while line and not line.startswith('~A'):   # Data.
             blank = re.search(r'\w', line) is None  # True if line is blank.
             comment = line.startswith('#')
             if not blank and not comment:
@@ -398,16 +404,16 @@ class LASReader(object):
         # data that follows the '~A' line.  We'll construct a structured
         # data type, and, if the data is not wrapped, use numpy.loadtext
         # to read the data into an array.  For wrapped rows, we use the
-        # function _read_wrapped() defined elsewhere in this module.
+        # function __read_wrapped() defined elsewhere in this module.
         # The data type is determined by the items from the '~Curves' section.
         dt = np.dtype([(name, float) for name in self.curves.names])
         if self.wrap:
-            a = _read_wrapped_data(f, dt)
+            a = self.__read_wrapped_data(f, dt)
         else:
             if self.dlm:
                 if self.dlm == ' ':
                     dlm = None
-                else: 
+                else:
                     dlm = self.dlm
                 a = np.loadtxt(f, delimiter=dlm, dtype=dt)
             else:

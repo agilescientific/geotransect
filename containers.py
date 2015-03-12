@@ -76,7 +76,8 @@ class TransectContainer(BaseContainer):
     """
     def __init__(self, params, layers, data):
 
-        print "\n+++++++++++++++++++++++++++++++++\nInitializing"
+        print "Welcome to geotransect!"
+        print "+++++++++++++++++++++++++++++++++\nInitializing"
 
         super(TransectContainer, self).__init__(params)
 
@@ -168,16 +169,16 @@ class LocmapContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "Updating map container"
+        print "\nUpdating", self.__class__.__name__
 
         pad = 5000      # m ... interior padding for map box
         aspect = 12/3.  # I was expecting it to be 8:3.
 
+        # Calculate the map bounds and centre.
         bounds = transect.bounds
         llx, lly, urx, ury = bounds
         w, h = urx - llx, ury - lly
 
-        # Guarantees the map will have correct aspect
         x_adj, y_adj = 0, 0
         if h > (w/aspect):
             x_adj = ((aspect*h) - w) / 2.  # Aspect is hard-coded in uberplot
@@ -193,18 +194,22 @@ class LocmapContainer(BaseContainer):
         self.ll, self.ur = ll, ur
         self.mid = Point(ll.x + 0.5*(ur.x-ll.x), ll.y + 0.5*(ur.y - ll.y))
 
-        # the goal is to send data to uberplot to plot
-        # we just want to find / compute data here
-        # we need to distinguish between shp and raster
-
-        for layer, fname in self.layers.items():
+        # Go over the layers and collect data.
+        for layer, details in self.layers.items():
+            fname = details['file']
             print layer, fname
-            items = []
+
+            # Deal with shapefiles.
+            shapes, names = [], []
             if fname.endswith(".shp"):
-                with fiona.open(fname) as c:  # collection
+                with fiona.open(fname) as c:
                     for s in c:
-                        items.append(shape(s['geometry']))
-            setattr(self, layer, items)
+                        shapes.append(shape(s['geometry']))
+                        # TODO: names.append(s['name'] or s['id'])
+            setattr(self, layer, shapes)
+
+            # TODO: Deal with rasters.
+            pass
 
 
 class ElevationContainer(BaseContainer):
@@ -226,7 +231,7 @@ class ElevationContainer(BaseContainer):
         # self.nsamples = 100
 
         self.data = np.zeros(self.nsamples)
-        self.coords = np.zeros(self.nsamples)
+        self.coords = self.linspace
 
         decimate = 1
 
@@ -265,7 +270,7 @@ class ElevationContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "Updating", type(self)
+        print "\nUpdating", self.__class__.__name__
 
         # space = np.linspace(0, transect.length, self.nsamples)
         for i, n in enumerate(self.linspace):
@@ -278,9 +283,6 @@ class ElevationContainer(BaseContainer):
             yi = np.abs(self.all_coords[1][:, 0] - y).argmin()
 
             self.data[i] = self.all_data[yi, xi]
-
-            # add the distance to the coordinates
-            self.coords[i] = n
 
 
 class BedrockContainer(BaseContainer):
@@ -308,7 +310,7 @@ class BedrockContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "Updating bedrock container"
+        print "\nUpdating", self.__class__.__name__
 
         self.reset_data()
 
@@ -367,7 +369,7 @@ class SeismicContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "Updating", type(self)
+        print "\nUpdating", self.__class__.__name__
 
         self.z = np.linspace(self.depth[0], self.depth[1], 1000)
 
@@ -380,10 +382,11 @@ class SeismicContainer(BaseContainer):
         points = filter(prepared.contains, self.lookup.keys())
 
         # Lookup for grouping traces into segy files
+        count = 0
         file_lookup = {}
         for point in points:
             meta = self.lookup[point]
-            print ".",
+            count += 1
             f = meta["segyfile"]
             if f in file_lookup:
                 proj_d = transect.project(point)
@@ -399,7 +402,7 @@ class SeismicContainer(BaseContainer):
 
         # Read in the chunks from the segy file
         for segyfile in file_lookup.keys():
-            print segyfile
+            print os.path.basename(segyfile)
             segy = readSEGY(segyfile, unpack_trace_headers=True)
             traces = file_lookup[segyfile]["trace"]
             coords = file_lookup[segyfile]["pos"]
@@ -418,8 +421,6 @@ class SeismicContainer(BaseContainer):
 
             self.data.append(np.transpose(data))
             self.coords.append(coords)
-
-        print file_lookup.keys()
 
 
 class PotfieldContainer(BaseContainer):
@@ -444,30 +445,36 @@ class PotfieldContainer(BaseContainer):
             name, ext = os.path.splitext(os.path.basename(f))
             with rasterio.drivers(CPL_DEBUG=True):
                 with rasterio.open(f) as src:
-                    self.all_data[name] = src.read()[0,
-                                                     0:-1:decimate,
-                                                     0:-1:decimate
-                                                     ]
+                    data = src.read()[0,
+                                      0:-1:decimate,
+                                      0:-1:decimate
+                                      ]
+
+                    # Clip the data to deal with outliers
+                    vmin = np.percentile(data, 2)
+                    vmax = np.percentile(data, 98)
+                    data[data > vmax] = vmax
+                    data[data < vmin] = vmin
+
+                    self.all_data[name] = data
 
                     # Get as lat/lon using the affine coordinate transform
                     # TODO - do this with proj? Why go via lo/la?
-                    la = np.arange(self.all_data[name].shape[1])
-                    lo = np.arange(self.all_data[name].shape[0])
-                    lat = la * src.affine[0]*decimate + src.affine[2]
-                    lon = lo * src.affine[4]*decimate + src.affine[5]
-                    wgs_grid = np.meshgrid(lat, lon)
+                    y = np.arange(self.all_data[name].shape[1])
+                    x = np.arange(self.all_data[name].shape[0])
+                    y = y * src.affine[0]*decimate + src.affine[2]
+                    x = x * src.affine[4]*decimate + src.affine[5]
+                    wgs_grid = np.meshgrid(y, x)
 
                     # TODO move to config
                     ll_wgs84 = pp.Proj("+init=EPSG:4269")
                     utm_nad83 = pp.Proj("+init=EPSG:26920")
 
-                    self.all_coords[name] = pp.transform(ll_wgs84,
+                    self.all_coords[name] = pp.transform(utm_nad83,
                                                          utm_nad83,
                                                          wgs_grid[0],
                                                          wgs_grid[1]
                                                          )
-
-        print "Found rasters", self.all_data.keys()
 
     def update(self, transect):
         """
@@ -479,9 +486,11 @@ class PotfieldContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "Updating potfield container"
+        print "\nUpdating", self.__class__.__name__
 
-        for k, v in self.all_data.items():
+        print "Found rasters", self.all_data.keys()
+
+        for k, data in self.all_data.items():
             self.coords[k] = self.linspace
             self.data[k] = np.zeros_like(self.linspace)
             for i in self.linspace:
@@ -490,7 +499,7 @@ class PotfieldContainer(BaseContainer):
                 xi = np.abs(self.all_coords[k][0][0, :] - x).argmin()
                 yi = np.abs(self.all_coords[k][1][:, 0] - y).argmin()
 
-                self.data[k][i] = v[yi, xi]
+                self.data[k][i] = data[yi, xi]
 
 
 class LogContainer(BaseContainer):
@@ -511,12 +520,12 @@ class LogContainer(BaseContainer):
         super(LogContainer, self).__init__(params)
 
         self.reset_all()
-        self.log_lookup = {}  # look up for log ids
 
         for shp in utils.walk(las_dir, '\\.shp$'):
-            with fiona.open(shp, "r") as logs:
-                for log in logs:
-                    self.lookup[shape(log["geometry"])] = log["properties"]['name']
+            with fiona.open(shp, "r") as wells:
+                for well in wells:
+                    shp = shape(well['geometry'])
+                    self.lookup[shp] = well["properties"]['name']
 
     def update(self, transect):
         """
@@ -528,7 +537,7 @@ class LogContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "Updating log container",
+        print "\nUpdating", self.__class__.__name__
 
         # Preprocess
         prepared = prep(transect.buffer(self.settings['buffer']))
@@ -540,21 +549,20 @@ class LogContainer(BaseContainer):
 
         for point in points:
             name = self.lookup[point]
-            # name = meta["name"]
-
             print name,
 
             # TODO: This has to be more dynamic
-            filename = os.path.join('data', 'wells', name,
+            filename = os.path.join(self.data_dir, 'wells', name,
                                     'wireline_log', name +
                                     '_out.LAS')
 
-            # Write out an error log?
             if not os.path.exists(filename):
                 continue
 
-            # store the transecting data
-            self.data.append(LASReader(filename, null_subs=np.nan))
+            well = LASReader(filename, null_subs=np.nan)
+            print well.curves.names
+
+            self.data.append(well)
             self.coords.append(transect.project(point))
             self.log_lookup[name] = self.data[-1]
 
@@ -562,8 +570,9 @@ class LogContainer(BaseContainer):
 
     def get(self, log_id):
         """
-        Returns data corresponding to log_id
+        Returns data corresponding to log_id.
         """
+        print "Looking up", log_id
         return self.log_lookup.get(log_id)
 
     def get_point(self, log_id):
@@ -590,6 +599,8 @@ class StriplogContainer(LogContainer):
         pass
 
     def update(self, transect):
+        print "\nUpdating", self.__class__.__name__
+
         # Preprocess
         prepared = prep(transect.buffer(self.settings['buffer']))
 

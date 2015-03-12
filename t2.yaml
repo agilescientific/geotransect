@@ -13,8 +13,9 @@ params:
         - 0
         - 3000
     data_dir: /Users/matt/Dropbox/geotransect_test/data
-    feature_well: # P-129
-    seismic_log: GR  # Not currently used
+    feature_well: P-129
+    seismic_log: GR
+    seismic_log_colour: lime
     settings: !include settings.yaml
 
 # Data strings are always interpreted as paths relative to data_dir in params.
@@ -34,8 +35,22 @@ data:
     tops_file: wells/P-129/tops/P-129_tops.txt  # Need to make this dynamic, or just handle in well
 
 map:  # In layer order, top = first
-    transects: transects/Transects.shp
-    wells: wells/wells.shp
-    seismic: seismic/seismic_lines.shp
-    shade: elevation/DEM_slope.tif
-    bedrock: bedrock/p00001gb.shp
+    transects:
+        file: transects/Transects.shp
+        params:
+            colour: blue
+            alpha: 0.67
+    wells:
+        file: wells/wells.shp
+        params:
+            colour: blue
+            alpha: 0.67
+    seismic:
+        file: seismic/seismic_lines.shp
+        params:
+            colour: black
+            alpha: 0.33
+    #shade:
+    #    file: elevation/DEM_slope.tif
+    #bedrock:
+    #    file: bedrock/p00001gb.shp

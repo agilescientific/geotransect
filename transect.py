@@ -70,6 +70,19 @@ def complete_paths(dictionary, root):
     return dictionary
 
 
+def complete_map_paths(dictionary, root):
+    """
+    The map dictionary is a bit more complicated.
+
+    Args:
+        dictionary (dict): A dict of relative file names or directories.
+        root (str): The absolute path to the relative paths in `dictionary`.
+    """
+    for k, v in dictionary.items():
+        dictionary[k]['file'] = os.path.join(root, v['file'])
+    return dictionary
+
+
 def main(ymlfile):
     """
     Load a config file, instantiate a TransectContainer, and plot it.
@@ -87,7 +100,7 @@ def main(ymlfile):
     params = cfg['params']
     root = cfg['params']['data_dir']
     data = complete_paths(cfg['data'], root)
-    layers = complete_paths(cfg['map'], root)
+    layers = complete_map_paths(cfg['map'], root)
     tc = TransectContainer(params, layers, data)
 
     tc.plot()

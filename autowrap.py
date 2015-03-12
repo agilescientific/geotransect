@@ -11,7 +11,7 @@ From http://stackoverflow.com/questions/4018860
 """
 
 
-def on_draw(event):
+def on_draw(event, axis=None):
     """
     Auto-wraps all text objects in a figure at draw-time
 
@@ -20,8 +20,13 @@ def on_draw(event):
     import matplotlib as mpl
     fig = event.canvas.figure
 
-    # Cycle through all artists in all the axes in the figure
-    for ax in fig.axes:
+    if axis:
+        axes = [axis]
+    else:
+        axes = fig.axes
+
+    # Cycle through all artists in the list
+    for ax in axes:
         for artist in ax.get_children():
             # If it's a text artist, wrap it...
             if isinstance(artist, mpl.text.Text):
