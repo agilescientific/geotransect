@@ -104,18 +104,20 @@ class TransectContainer(BaseContainer):
         # TODO: Allow decimation?
         params['length'] = self.length = int(np.floor(self.data.length))
         params['nsamples'] = self.nsamples = self.length + 1
-        params['linspace'] = self.linspace = np.linspace(0, self.length, self.nsamples)
+        params['linspace'] = self.linspace = np.linspace(0, self.length,
+                                                         self.nsamples)
 
         self.tops_file = data['tops_file']
         self.log = LogContainer(data['well_dir'], params)
-        velocity_model = VelocityContainer(data['velocity_file'], self.log, params)
+        velocity_model = VelocityContainer(data['velocity_file'],
+                                           self.log,
+                                           params)
         self.seismic = SeismicContainer(data['seismic_dir'],
                                         velocity_model,
                                         params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
         self.striplog = StriplogContainer(data['striplog_dir'], params)
-        # self.potfield = PotfieldContainer(data['potfield_dir'], params)
         self.potfield = PotfieldContainer(potfields, params)
         self.locmap = LocmapContainer(layers, params)
 
@@ -211,7 +213,7 @@ class LocmapContainer(BaseContainer):
             self.layers[layer]['params'] = params
 
             # Get a list of shapes from the file.
-            shapes, names = [], []
+            shapes = []
             fname, ext = os.path.splitext(os.path.basename(path))
             if ext.strip('.').lower() in self.settings['raster_extensions']:
                 # TODO: Deal with rasters.
@@ -220,7 +222,9 @@ class LocmapContainer(BaseContainer):
                 with fiona.open(path) as c:
                     for s in c:
                         shapes.append(shape(s['geometry']))
-                        # TODO: names.append(s['name'] or s['id'])
+                        # name = s.get('name') or s.get('id') or None
+                        # data = {name: shape(s['geometry'])}
+                        # setattr(self, 'data', data)
                 setattr(self, layer, shapes)
             else:
                 pass
@@ -446,26 +450,33 @@ class PotfieldContainer(BaseContainer):
 
         self.data = {}
 
-        for name, params in potfields.items():
+        for name, pf_params in potfields.items():
 
             # Populate these now.
             all_data = {}
             all_coords = {}
 
-            all_data, all_coords = self.__get_all_data(params)
+            all_data, all_coords = self.__get_all_data(pf_params)
 
             c_def = self.settings['default_colour']
-
-            cif = params['colour_is_file']
+            cif = pf_params['colour_is_file']
             if cif:
-                all_colour = self.__get_all_data(params, colour=True)[0]
+                all_colour = self.__get_all_data(pf_params, colour=True)[0]
             else:
-                all_colour = params.get('colour', c_def)
+                all_colour = pf_params.get('colour', c_def)
+
+            cmap = pf_params.get('cmap')
+            if not cmap:
+                cmap = self.settings.get('default_cmap')
+
+            scale = pf_params.get('scale')
 
             payload = {'all_data': all_data,
                        'all_coords': all_coords,
                        'all_colour': all_colour,
-                       'colour_is_file': cif}
+                       'colour_is_file': cif,
+                       'cmap': cmap,
+                       'scale': scale}
 
             self.data[name] = payload
 
@@ -488,6 +499,7 @@ class PotfieldContainer(BaseContainer):
             payload['data'] = np.zeros_like(self.linspace)
             if payload['colour_is_file']:
                 payload['colour'] = np.zeros_like(self.linspace)
+                print name, self.linspace
             else:
                 payload['colour'] = payload['all_colour']
 
@@ -499,7 +511,10 @@ class PotfieldContainer(BaseContainer):
 
                 payload['data'][i] = payload['all_data'][yi, xi]
                 if payload['colour_is_file']:
-                    payload['colour'][i] = payload['all_colour'][yi, xi]
+                    try:
+                        payload['colour'][i] = payload['all_colour'][yi, xi]
+                    except IndexError:
+                        payload['colour'][i] = 0
 
             self.data[name] = payload
 
@@ -522,6 +537,8 @@ class PotfieldContainer(BaseContainer):
 
                 # Clip the data to deal with outliers
                 perc = params.get('clip', 100)
+                if colour:
+                    perc = 95
                 vmin = np.percentile(all_data, 100-perc)
                 vmax = np.percentile(all_data, perc)
                 all_data[all_data > vmax] = vmax
@@ -589,9 +606,11 @@ class LogContainer(BaseContainer):
         points = filter(prepared.contains, self.lookup.keys())
 
         self.reset_data()
+        self.names = []
 
         for point in points:
             name = self.lookup[point]
+            self.names.append(name)
             print name,
 
             # TODO: This has to be more dynamic
@@ -599,17 +618,15 @@ class LogContainer(BaseContainer):
                                     'wireline_log', name +
                                     '_out.LAS')
 
-            if not os.path.exists(filename):
-                continue
+            if os.path.exists(filename):
+                well = LASReader(filename, null_subs=np.nan)
+                print well.curves.names
+                self.data.append(well)
+                self.log_lookup[name] = self.data[-1]
+            else:
+                self.data.append(None)
 
-            well = LASReader(filename, null_subs=np.nan)
-            print well.curves.names
-
-            self.data.append(well)
             self.coords.append(transect.project(point))
-            self.log_lookup[name] = self.data[-1]
-
-        print "\n",
 
     def get(self, log_id):
         """

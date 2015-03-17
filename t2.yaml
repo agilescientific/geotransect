@@ -5,15 +5,16 @@
 # Params are passed directly to the TransectContainer object, and all of the
 # Containers it contains, so you have access to them everywhere. 
 params:
-    title: Transect 1 
+    title: Transect 2 
     basin: Windsor  # We should get this from the basins shapefile 
-    id: 1
+    id: 2
     description: This transect is the one we are using to test this module. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
     depth:
         - 0
         - 3000
     data_dir: /Users/matt/Dropbox/geotransect_test/data
-    feature_well: P-129
+    feature_well: P-114
+    seismic_cmap: Greys  # http://ageo.co/modelrcolour
     seismic_log: GR
     seismic_log_colour: lime
     settings: !include settings.yaml
@@ -31,19 +32,21 @@ data:
     bedrock_dir: bedrock
     basins_dir: basins  # Not currently used
     striplog_dir: wells
-    tops_file: wells/P-129/tops/P-129_tops.txt  # Need to make this dynamic, or just handle in well
+    tops_file: wells/P-114/tops/P-114_tops.txt  # Need to make this dynamic, or just handle in well
 
 potfields:
     Bouger:
         file: potfield/r154nsboug.grd
         colour: potfield/canada200m_rtf_may2014_UTM.GRD
+        cmap: jet
         scale:
-            - 0
-            - -20
+            - 0    # ymax
+            - -25  # ymin
     Canada_200m:
         file: potfield/canada200m_rtf_may2014_UTM.GRD
-        colour: red
-        clip: 99
+        colour: potfield/r154nsboug.grd
+        cmap: jet
+        #clip: 99
         decimate: 1
 
 # TODO: Only use one level of nesting
@@ -54,7 +57,7 @@ map_layers:  # In layer order, top = first
         alpha: 0.67
     wells:
         file: wells/wells.shp
-        colour: blue
+        colour: black
         alpha: 0.67
     seismic:
         file: seismic/seismic_lines.shp

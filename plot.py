@@ -73,7 +73,6 @@ def plot_point(m, point, colour='b', shape='o', alpha=1, zorder=None):
         List: A list of matplotlib points.
     """
     lo, la = point.xy
-    print "Plotting point", lo, la
     x, y = m(lo, la)
     return m.scatter(x, y,
                      s=20,
@@ -143,7 +142,6 @@ def plot(tc):
     Args:
         transect (TransectContainer): A transect container.
     """
-
     h = 15
     mw = 16  # width of main section (inches) must be div by 4
     fw = 5   # width of the feature plot (inches) must be div by 5
@@ -265,6 +263,11 @@ def plot(tc):
                                zorder=100,
                                colour='k',
                                alpha=0.5)
+                lo, la = point_t.xy
+                x, y = m(lo, la)
+                # Plot the names of wells in the xsection
+                # When we have names we can also plot special symbol
+                # for the feature well.
 
     # Plot this transect line
     line_t = utils.utm2lola(tc.data)
@@ -291,8 +294,14 @@ def plot(tc):
         hsv = np.array([[geo["AV_HUE"], geo["AV_SAT"],
                          geo["AV_VAL"]]]).reshape(1, 1, 3)
         color = hsv_to_rgb(hsv / 255.)
-        elevation.plot(tc.elevation.coords[idx], tc.elevation.data[idx],
-                       linewidth=3, color=color.flatten())
+        # elevation.plot(tc.elevation.coords[idx], tc.elevation.data[idx],
+        #                linewidth=3, color=color.flatten())
+
+        elevation.bar(tc.elevation.coords[idx],
+                      tc.elevation.data[idx],
+                      width=1.0,
+                      linewidth=0,
+                      color=color.flatten())
 
     max_height = np.amax(tc.elevation.all_data)
 
@@ -314,57 +323,64 @@ def plot(tc):
     # Seismic cross section
     # ------------------------------------------------------------#
     for coords, data in zip(tc.seismic.coords, tc.seismic.data):
-
-        z0 = 0
-        depth = tc.depth[-1]
         xsection.imshow(data,
                         extent=[np.amin(coords) / 1000.0,
                                 np.amax(coords) / 1000.0,
-                                depth, z0],
-                        aspect="auto", cmap="Greys")
-
-        plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
-                     tc.extents[2], tc.extents[3]]
-        xsection.axis(plot_axis)
-
+                                tc.depth[-1], 0],
+                        aspect="auto", cmap=tc.seismic_cmap)
+    plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
+                 tc.extents[2], tc.extents[3]]
+    xsection.axis(plot_axis)
+    xsection.set_xticks([])
     xsection.set_ylabel("Depth [m]", fontsize=8)
-    xsection.set_xlabel("Transect range [km]", fontsize=8)
-
     xsection.tick_params(axis='y', which='major', labelsize=8)
-    xsection.tick_params(axis='y', which='minor', labelsize=8)
-
-    xsection.tick_params(axis='x', which='major', labelsize=8)
-    xsection.tick_params(axis='x', which='minor', labelsize=8)
-
+    xsection.tick_params(axis='x', which='major', labelsize=0)
     xsection.grid(True)
     xsection.set_frame_on(False)
 
     # Log overlays
     # --------------------------------------------------------#
-    for las, pos in zip(tc.log.data, tc.log.coords):
+    if tc.locmap.layers.get('wells'):
+        if tc.locmap.layers['wells'].get('colour'):
+            well_colour = tc.locmap.layers['wells']['colour']
+        else:
+            well_colour = tc.settings.get('default_colour')
+            if not well_colour:
+                well_colour = 'k'
 
-        data = np.nan_to_num(las.data[tc.seismic_log])
-        name = las.well.WELL.data
-
-        # Normalize and position.
-        data /= np.amax(data)
-        lgsc = 0.015  # hack to compress the log width
-        data *= lgsc * (tc.extents[1] - tc.extents[0])
-        data += pos
-
+    for name, las, pos in zip(tc.log.names, tc.log.data, tc.log.coords):
         c = tc.seismic_log_colour
-        z = las.data['DEPT']
-        xsec_logs.plot(data, z, c, lw=0.5, alpha=0.5)
-        xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
-        xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
-        xsec_logs.axis("off")
+        if las:
+            data = np.nan_to_num(las.data[tc.seismic_log])
+            data /= np.amax(data)
+            lgsc = 0.015  # hack to compress the log width
+            data *= lgsc * (tc.extents[1] - tc.extents[0])
+            data += pos - 0.5 * np.amax(data)
+            z = las.data['DEPT']
+            xsec_logs.axvline(x=pos,
+                              color=well_colour,
+                              alpha=0.25,
+                              ymin=0,
+                              ymax=z[-1])
+            xsec_logs.plot(data, z, c, lw=0.5, alpha=0.75)
+            xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
+            xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
+            xsec_logs.axis("off")
+        else:
+            # Need to get TD from SHP or well header sheet.
+            z = [tc.extents[2]-40]
+            xsec_logs.axvline(x=pos, color=well_colour, alpha=0.25)
+
+        elevation.axvline(x=pos, color=well_colour, alpha=0.25)
+        potfield.axvline(x=pos, color=well_colour, alpha=0.25)
 
         # Well name annotation
-        xsec_logs.text(pos, z[-1]+20,
+        xsec_logs.text(pos, 20,
                        name,
-                       color=c,
+                       color=well_colour,
                        va='top',
-                       fontsize=10)
+                       ha='center',
+                       fontsize=12)
 
     # Log type annotation, top left
     xsec_logs.text(500, 20,
@@ -381,29 +397,37 @@ def plot(tc):
         rect = [0, bot, 1, height]
         this_ax = add_subplot_axes(potfield, rect)
 
-        c = payload['colour']
-        data = payload['data']
-        coords = payload['coords']
-
-        this_ax.scatter(coords,
-                        data,
-                        color=c,
+        this_ax.scatter(payload['coords'],
+                        payload['data'],
+                        c=payload['colour'],
+                        cmap=payload['cmap'],
                         s=1,
                         edgecolor='')
+
         this_ax.set_xlim(tc.extents[:2])
         this_ax.set_frame_on(False)
         this_ax.set_xticks([])
         this_ax.tick_params(axis='y', which='major', labelsize=8)
         this_ax.grid(True)
+        scale = payload['scale']
+        if scale:
+            this_ax.set_ylim(float(scale[1]), float(scale[0]))
         ymax = this_ax.get_ylim()[1]
         this_ax.text(1000, ymax, field,
                      va='top',
                      fontsize=10,
                      color='k')
 
+    potfield.set_xlim(tc.extents[:2])
     potfield.set_frame_on(False)
-    potfield.set_xticks([])
     potfield.set_yticks([])
+
+    plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
+                 tc.extents[2], tc.extents[3]]
+    potfield.axis(plot_axis)
+    potfield.xaxis.grid(True, which='major')
+    potfield.tick_params(axis='x', which='major', labelsize=10)
+    potfield.set_xlabel("Transect range [km]", fontsize=10)
 
     #  Feature plot
     # -----------------------------------------------------#
@@ -425,19 +449,18 @@ def plot(tc):
     im = Image.open(path)
     im = np.array(im).astype(np.float) / 255
 
-    # Place in axis:
-    logo.imshow(im)
-    logo.axis('off')
-    logo.text(0.1, 0.7,
-              ("Department of Energy, Nova Scotia, Canada"),
-              verticalalignment='top',
-              horizontalalignment='left')
+    # # Place in axis:
+    # logo.text(0.1, 0.7,
+    #           ("Department of Energy, Nova Scotia, Canada"),
+    #           verticalalignment='top',
+    #           horizontalalignment='left')
 
     logo.axhline(y=0.7,
                  xmin=0.1,
                  xmax=0.9,
                  linewidth=1,
                  color='k')
+    logo.imshow(im)
     logo.axis("off")
 
     # Finish

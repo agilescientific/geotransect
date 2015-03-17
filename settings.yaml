@@ -11,5 +11,6 @@ raster_extensions:
     - asc
 buffer: 1000
 map_padding: 10000
-default_colour: blue
-curve_display: templates/Petrophysics_display_template.csv
+default_colour: blue     # http://ageo.co/namedcolours
+default_cmap: gist_heat  # http://ageo.co/modelrcolour
+curve_display: Petrophysics_display_template.csv

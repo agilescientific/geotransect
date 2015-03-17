@@ -70,9 +70,22 @@ def complete_paths(dictionary, root):
     return dictionary
 
 
-def complete_pot_paths(dictionary, root):
+def complete_map_paths(dictionary, root):
     """
     The map dictionary is a bit more complicated.
+
+    Args:
+        dictionary (dict): A dict of relative file names or directories.
+        root (str): The absolute path to the relative paths in `dictionary`.
+    """
+    for k, v in dictionary.items():
+        dictionary[k]['file'] = os.path.join(root, v['file'])
+    return dictionary
+
+
+def complete_pot_paths(dictionary, root):
+    """
+    The potfield dictionary is more complicated still.
 
     Args:
         dictionary (dict): A dict of relative file names or directories.
@@ -87,19 +100,6 @@ def complete_pot_paths(dictionary, root):
                 dictionary[k]['colour_is_file'] = True
             else:
                 dictionary[k]['colour_is_file'] = False
-    return dictionary
-
-
-def complete_map_paths(dictionary, root):
-    """
-    The map dictionary is a bit more complicated.
-
-    Args:
-        dictionary (dict): A dict of relative file names or directories.
-        root (str): The absolute path to the relative paths in `dictionary`.
-    """
-    for k, v in dictionary.items():
-        dictionary[k]['file'] = os.path.join(root, v['file'])
     return dictionary
 
 

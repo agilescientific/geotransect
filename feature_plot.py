@@ -112,7 +112,8 @@ def plot_feature_well(tc, gs):
         params = get_curve_params(curve, fname)
         ncurv_per_track[params['track']] += 1
 
-    gs.update(wspace=0)
+    # Would like feature plot to have different wspace, but this adjusts all.
+    # gs.update(wspace=0)
 
     axss = plt.subplot(gs[2:-1, -5])
     axs0 = [axss, axss.twiny()]
@@ -123,23 +124,27 @@ def plot_feature_well(tc, gs):
 
     axs = [axs0, axs1, axs2, axs3, axs4]
 
-    #striplog = tc.striplog.get(tc.feature_well)
-    #plot_striplog(axs0[0], striplog, width=5, alpha=0.75,
-    #             ladder=True)
+    # striplog = tc.striplog.get(tc.feature_well)
+    # plot_striplog(axs0[0], striplog, width=5, alpha=0.75,
+    #               ladder=True)
 
     axs0[0].set_ylim([Z[-1], 0])
     label_shift = np.zeros(len(axs))
 
     for curve in curves:
-        values = logs.data[curve]
+        try:
+            values = logs.data[curve]
+        except ValueError:
+            print "Curve not present:", curve
+            values = np.empty_like(Z)
+            values[:] = np.nan
+
         params = get_curve_params(curve, fname)
         i = params['track']
 
         j = 0
 
         label_shift[i] += 1
-
-        units = '$%s$' % params['units']
 
         linOrlog = params['logarithmic']
 
@@ -218,15 +223,17 @@ def plot_feature_well(tc, gs):
         trans = transforms.blended_transform_factory(axs[i][j].transData,
                                                      axs[i][j].transData)
 
-        axs[i][j].text(xpos, -130 - 40*(label_shift[i]-1),
+        magic = -1 * Z[-1] / 15.
+        axs[i][j].text(xpos, magic - (magic/5)*(label_shift[i]-1),
                        curve,
                        horizontalalignment='center',
                        verticalalignment='bottom',
                        fontsize=12, color=params['hexcolor'],
                        transform=trans)
         # curve units
+        units = '${}$'.format(params['units'])
         if label_shift[i] <= 1:
-            axs[i][j].text(xpos, -110,
+            axs[i][j].text(xpos, magic+20,
                            units,
                            horizontalalignment='center',
                            verticalalignment='top',
@@ -277,31 +284,39 @@ def plot_feature_well(tc, gs):
         label.set_rotation(90)
         label.set_fontsize(10)
 
-    tops_fname = os.path.join(tc.data_dir,
-                              tc.tops_file)
-    tops = get_tops(tops_fname)
-    topx = get_curve_params('DT', fname)
-    topmidpt = np.amax((topx)['xright'])
+    try:
+        tops_fname = os.path.join(tc.data_dir, tc.tops_file)
+        if os.path.exists(tops_fname):
+            tops = get_tops(tops_fname)
+            topx = get_curve_params('DT', fname)
+            topmidpt = np.amax((topx)['xright'])
 
-    # plot tops
-    for i in range(ntracks):
+            # plot tops
+            for i in range(ntracks):
 
-        for mkr, depth in tops.iteritems():
+                for mkr, depth in tops.iteritems():
 
-            # draw horizontal bars at the top position
-            axs[i][-1].axhline(y=depth,
-                               xmin=0.01, xmax=.99,
-                               color='b', lw=2,
-                               alpha=0.5,
-                               zorder=100)
+                    # draw horizontal bars at the top position
+                    axs[i][-1].axhline(y=depth,
+                                       xmin=0.01, xmax=.99,
+                                       color='b', lw=2,
+                                       alpha=0.5,
+                                       zorder=100)
 
-            # draw text box at the right edge of the last track
-            axs[-1][-1].text(x=topmidpt, y=depth, s=mkr,
-                             alpha=0.5, color='k',
-                             fontsize='8',
-                             horizontalalignment='center',
-                             verticalalignment='center',
-                             zorder=10000,
-                             bbox=dict(facecolor='white', edgecolor='k',
-                                       alpha=0.25, lw=0.25),
-                             weight='light')
+                    # draw text box at the right edge of the last track
+                    axs[-1][-1].text(x=topmidpt, y=depth, s=mkr,
+                                     alpha=0.5, color='k',
+                                     fontsize='8',
+                                     horizontalalignment='center',
+                                     verticalalignment='center',
+                                     zorder=10000,
+                                     bbox=dict(facecolor='white',
+                                               edgecolor='k',
+                                               alpha=0.25,
+                                               lw=0.25),
+                                     weight='light')
+
+    except AttributeError:
+        print "No tops for this well."
+
+    return gs
