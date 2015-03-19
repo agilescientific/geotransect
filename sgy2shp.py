@@ -38,8 +38,8 @@ utm_nad83 = pp.Proj("+init=EPSG:26920")
 
 
 class ShapeFileExists(Exception):
-
     pass
+
 
 def sgy2shp(input_dir, output_dir, convert=False):
     """
@@ -55,10 +55,9 @@ def sgy2shp(input_dir, output_dir, convert=False):
 
     line_out_file = os.path.join(output_dir, "seismic_lines.shp")
 
-    
     if os.path.exists(line_out_file):
         raise ShapeFileExists
-    
+
     # Set up the shapefile schema.
     line_schema = {'geometry': 'LineString',
                    'properties': {'segyfile': 'str',
@@ -137,11 +136,12 @@ def sgy2shp(input_dir, output_dir, convert=False):
                                                     'trace': i}
                                      })
 
-            #linestring = LineString(points)
-            #line_out.write({'geometry': mapping(linestring),
-            #                'properties': {'segyfile': path,
-            #                               'line': filebase}
-            #                })
+            # We need this to plot seismic lines on the map.
+            linestring = LineString(points)
+            line_out.write({'geometry': mapping(linestring),
+                            'properties': {'segyfile': path,
+                                           'line': filebase}
+                            })
 
 
 def main():

@@ -326,7 +326,7 @@ def plot(tc):
         xsection.imshow(data,
                         extent=[np.amin(coords) / 1000.0,
                                 np.amax(coords) / 1000.0,
-                                tc.depth[-1], 0],
+                                tc.range[-1], 0],
                         aspect="auto", cmap=tc.seismic_cmap)
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
