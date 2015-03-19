@@ -27,9 +27,11 @@ import xlrd
 from las import LASReader
 from plot import plot
 from lithology.lithology import intervals_from_las3_string
-from sgy2shp import sgy2shp
+from sgy2shp import sgy2shp, ShapeFileExists
 import utils
 
+from scipy.interpolate import interp1d
+from agilegeo.avo import time_to_depth
 
 class ContainerError(Exception):
     pass
@@ -109,11 +111,10 @@ class TransectContainer(BaseContainer):
 
         self.tops_file = data['tops_file']
         self.log = LogContainer(data['well_dir'], params)
-        velocity_model = VelocityContainer(data['velocity_file'],
-                                           self.log,
-                                           params)
+        self.velocity = VelocityContainer(data['velocity_dir'],
+                                                params)
         self.seismic = SeismicContainer(data['seismic_dir'],
-                                        velocity_model,
+                                        self.velocity,
                                         params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
@@ -132,6 +133,7 @@ class TransectContainer(BaseContainer):
 
         print "\n+++++++++++++++++++++++++++++++++\nUpdating"
         # update the containers
+        self.velocity.update(self.data)
         self.seismic.update(self.data)
         self.log.update(self.data)
         self.elevation.update(self.data)
@@ -346,38 +348,43 @@ class BedrockContainer(BaseContainer):
         self.coords = np.array([self.coords[i] for i in idx])
 
 
-class SeismicContainer(BaseContainer):
+
+class SegyContainer(BaseContainer):
     """
-    Class for reading and plotting seismic data.
+    Superclass for handling Segy data.
 
     Args:
-        seis_dir (str): Input directory containing seismic SEGY files.
-        params (dict): The parameters, as specified in the config.
+        segy_dir (str): Input directory containing Segy files.
+        params (dict): The parameters, as specified in the config
 
-    Example:
+        Example:
         >>> seis_dir = 'seismic/segy_files/'
         >>> params = {'domain': 'depth', 'buffer': 300, ... }
-        >>> seis = seismicContainer(seis_dir, params)
+        >>> segy = SegyContainer(seis_dir, params)
     """
-    def __init__(self, seis_dir, velocity, params):
 
-        # First generate the parent object.
-        super(SeismicContainer, self).__init__(params)
+    def __init__(self, segy_dir, params):
 
-        # This creates a (hidden) shapefile for each seismic line,
-        # then steps over them to read their positions and meta.
-        # TODO Simplify this... maybe don't even write the files.
-        sgy2shp(seis_dir, seis_dir)
 
+        super(SegyContainer, self).__init__(params)
+
+        try:
+            # This creates a (hidden) shapefile for each seismic line,
+            # then steps over them to read their positions and meta.
+            # TODO Simplify this... maybe don't even write the files.
+            sgy2shp(segy_dir, segy_dir)
+        except ShapeFileExists:
+            pass
+        
         self.reset_all()
-        self.velocity = velocity
 
-        for f in utils.listdir(seis_dir, '\\..+\\.shp$'):
+        for f in utils.listdir(segy_dir, '\\..+\\.shp$'):
             with fiona.open(f, "r") as traces:
                 for trace in traces:
                     self.lookup[shape(trace["geometry"])] = trace["properties"]
 
-    def update(self, transect):
+
+    def update(self, transect, flat=False):
         """
         Updates the container data to a profile that intersect the
         transect line.
@@ -386,10 +393,11 @@ class SeismicContainer(BaseContainer):
 
         Args:
             transect (LineString): A transect line.
+            flat (Bool): Reads data into a flat list instead of
+                         sorting by files. 
         """
         print "\nUpdating", self.__class__.__name__
 
-        self.z = np.linspace(self.depth[0], self.depth[1], 1000)
 
         self.reset_data()
 
@@ -430,16 +438,65 @@ class SeismicContainer(BaseContainer):
             idx = sorted(range(len(traces)), key=lambda k: traces[k])
             idx = filter(None, idx)
 
-            coords = np.array([coords[i] for i in idx])
-            data = np.array([self.velocity.time2depth(
-                             segy.traces[traces[i]].data,
-                             segy.traces[traces[i]].stats["sampling_rate"],
-                             points[i], self.z)
-                             for i in idx])
+            coords = [coords[i] for i in idx]
+            data = [segy.traces[traces[i]]
+                             for i in idx]
 
-            self.data.append(np.transpose(data))
-            self.coords.append(coords)
+            if flat:
+                self.data += data
+                self.coords += coords
+            else:
+                self.data.append(data)
+                self.coords.append(coords)
 
+
+
+class SeismicContainer(SegyContainer):
+    """
+    Class for reading and plotting seismic data.
+
+    Args:
+        seis_dir (str): Input directory containing seismic SEGY files.
+        params (dict): The parameters, as specified in the config.
+
+    Example:
+        >>> seis_dir = 'seismic/segy_files/'
+        >>> params = {'domain': 'depth', 'buffer': 300, ... }
+        >>> seis = seismicContainer(seis_dir, params)
+    """
+        
+    def __init__(self, seis_dir, velocity, params):
+
+        # First generate the parent object.
+        super(SeismicContainer, self).__init__(seis_dir, params)
+
+        self.velocity = velocity
+
+       
+
+    def update(self, transect):
+
+        # Do the super class
+        super(SeismicContainer,self).update(transect)
+
+        # Do the time to depth conversion
+        self.dz = 25.0
+
+        depth_data = []
+        # Loop through files
+        for segydata, coords in zip(self.data, self.coords):
+            # Through traces
+            traces = []
+            for trace, coord in zip(segydata, coords):
+                traces.append(self.velocity.time2depth(trace.data,
+                                                       coord,
+                                                       1.0/trace.stats["sampling_rate"],
+                                                       self.dz))
+            depth_data.append(np.transpose(np.array(traces)))
+            
+        self.data = depth_data
+        
+        
 
 class PotfieldContainer(BaseContainer):
     """
@@ -695,65 +752,61 @@ class StriplogContainer(LogContainer):
         self.data.plot()
 
 
-class VelocityContainer(BaseContainer):
+class VelocityContainer(SegyContainer):
     """
     Container for managing velocity profiles.
 
-    Args:
-    vel_xls (str): Velocity depth lookup tables in xls format.
-        Each sheet name should correspond to an existing
-        log, which will contain the position information.
-    las_container (LogContainer): Log container used to get position
-        information.
+    See SegyContainer
     """
 
-    def __init__(self, vel_xls, las_container, params):
-        super(VelocityContainer, self).__init__(params)
-        book = xlrd.open_workbook(vel_xls)
-        self.lookup = {}
-        for sheet in book.sheets():
-            name = sheet.name
-            point = las_container.get_point(str(name))
-            if point:
-                twt = np.array([i.value for i in sheet.col(1)[1:]])
-                depth = np.array([i.value for i in sheet.col(2)[1:]])
-                self.lookup[point] = [twt, depth]
+    def __init__(self, vel_dir, params):
 
-    def get_profile(self, point):
-        """
-        Returns the velocity profile closest to the point
+        SegyContainer.__init__(self,vel_dir, params)
 
-        Args:
-        point (Point): Point object of the location of the desired
-            velocity profile.
+    def update(self, transect):
 
-        Returns:
-            (array, 1d) of the velocity profile closest to input point.
-        """
-        vel_points = self.lookup.keys()
-        distance = [(np.array(p)[0] - np.array(point)[0])**2.0 +
-                    (np.array(p)[0] - np.array(point)[1])**2.0 for
-                    p in vel_points]
-        profile = self.lookup[vel_points[np.argmin(distance)]]
-        return profile
+        super(VelocityContainer, self).update(transect, flat=True)
 
-    def time2depth(self, trace, sample_rate, point, z):
+      
+    def time2depth(self, trace, point, dt, dz):
         """
         Converts a seismic trace from time to depth.
 
         Args:
             trace (array, 1d): A 1D numpy array.
-            sample_rate (float): The sample rate of the of the data [samp/sec].
-            point (Point): Point object corresponding to the trace location.
+            point (float):  distance along transect corresponding to
+            the trace location.
         """
-        profile = self.get_profile(point)
-        trace_time = np.arange(0, trace.size)/sample_rate
-        # Interpolate lookup table to be more samples.
-        time = profile[0]
-        depth = profile[1]
-        vrms = 2 * depth / (time+0.000001)
-        # Fix the divide by zero.
-        vrms[0] = vrms[1]
-        vrms = np.interp(trace_time, time, vrms)
-        depth = vrms * trace_time
-        return np.interp(z, depth, trace, left=0, right=0)
+    
+        distance = [(p - point)**2.0 for p in self.coords]
+        idx = np.argmin(distance)
+
+        
+        profile = self.data[idx]
+        seismic = np.array(trace)
+        
+        ## HACK TO MAKE FAKE VELOCITIES
+        velocity = np.array(np.random.randn(profile.data.size)\
+                            * 100.0 + 2000)
+
+        print idx+1,'of', len(self.coords)
+        vel_t = np.arange(velocity.size)* \
+                          1.0 / profile.stats["sampling_rate"]
+
+        t = np.arange(seismic.size)*dt
+
+        velocity = np.interp(t, vel_t, velocity, velocity[0],
+                             velocity[-1])
+
+        
+        
+
+
+        z = np.arange(self.depth[0], self.depth[1], dz)
+        
+        data =  time_to_depth(seismic,
+                              velocity, t,z)
+       
+
+        return data
+  

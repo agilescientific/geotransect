@@ -12,7 +12,7 @@ params:
     depth:
         - 0
         - 3000
-    data_dir: /Users/matt/Dropbox/geotransect_test/data
+    data_dir: data
     feature_well: P-114
     seismic_cmap: Greys  # http://ageo.co/modelrcolour
     seismic_log: GR
@@ -26,7 +26,7 @@ params:
 data:
     transect_file: transects/Transects.shp
     seismic_dir: seismic
-    velocity_file: velocity/tdr_wells.xls
+    velocity_dir: velocity
     well_dir: wells
     elevation_file: elevation/NS_DEM_ascii.asc
     bedrock_dir: bedrock
