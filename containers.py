@@ -114,6 +114,7 @@ class TransectContainer(BaseContainer):
         self.seismic = SeismicContainer(data['seismic_dir'],
                                         self.velocity,
                                         params)
+        self.horizons = HorizonContainer(data['horizon_dir'], params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
         self.striplog = StriplogContainer(data['striplog_dir'], params)
@@ -133,6 +134,7 @@ class TransectContainer(BaseContainer):
         # update the containers
         self.velocity.update(self.data)
         self.seismic.update(self.data)
+        self.horizons.update(self.data)
         self.log.update(self.data)
         self.elevation.update(self.data)
         self.bedrock.update(self.data)
@@ -492,6 +494,76 @@ class SeismicContainer(SegyContainer):
         self.data = data
 
 
+class HorizonContainer(BaseContainer):
+    """
+    Class for reading and plotting seismic horizons.
+
+    Args:
+        hor_dir (str): Input directory containing seismic SEGY files.
+        params (dict): The parameters, as specified in the config.
+
+    Example:
+        >>> seis_dir = 'seismic/segy_files/'
+        >>> params = {'domain': 'depth', 'buffer': 300, ... }
+        >>> seis = seismicContainer(seis_dir, params)
+    """
+
+    def __init__(self, hor_dir, params):
+
+        # First generate the parent object.
+        super(HorizonContainer, self).__init__(params)
+
+        self.data = {}
+        self.coords = {}
+
+        self.lookup = {}
+
+        for fname in utils.listdir(hor_dir):
+            with open(fname) as f:
+                samples = f.readlines()
+            name = samples.pop(0).strip().strip('#')
+            this_lookup = {}
+            for s in samples:
+                line, cdp, x, y, t, surv = s.split()
+                x, y = float(x), float(y)
+                t = float(t)
+                this_lookup[Point(x, y)] = t
+
+            if self.lookup.get(name):
+                # Then it already exists so add to it.
+                self.lookup[name].update(this_lookup)
+            else:
+                # Then it's new data so grab what we have.
+                self.lookup[name] = this_lookup
+
+    def update(self, transect):
+        print "\nUpdating", self.__class__.__name__
+
+        for horizon, lookup in self.lookup.items():
+
+            print horizon, len(lookup),
+
+            # Prepare results.
+            self.data[horizon] = np.zeros(self.nsamples)
+            self.coords[horizon] = self.linspace
+
+            b = self.settings['buffer']
+
+            # Having to decimate massively because it takes too long.
+            for n, i in enumerate(self.coords[horizon][::100]):
+                p = transect.interpolate(i)
+
+                # This should drastically reduce the number of points to
+                # inspect. but it's still way way slow.
+                prepared = prep(p.buffer(b))
+                points = filter(prepared.contains, lookup.keys())
+                print len(points)
+
+                if points:
+                    pi = utils.nearest_point(p, points)
+                    self.data[horizon][n] = lookup.get(pi, 0)
+
+
 class PotfieldContainer(BaseContainer):
     """
     Contains potential field data.
@@ -543,14 +615,13 @@ class PotfieldContainer(BaseContainer):
         """
         print "\nUpdating", self.__class__.__name__
 
-        print "Found rasters", self.data.keys()
+        print self.data.keys()
 
         for name, payload in self.data.items():
             payload['coords'] = self.linspace
             payload['data'] = np.zeros_like(self.linspace)
             if payload['colour_is_file']:
                 payload['colour'] = np.zeros_like(self.linspace)
-                print name, self.linspace
             else:
                 payload['colour'] = payload['all_colour']
 

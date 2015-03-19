@@ -28,6 +28,7 @@ params:
 data:
     transect_file: transects/Transects.shp
     seismic_dir: seismic
+    horizon_dir: horizons
     velocity_dir: velocity
     well_dir: wells
     elevation_file: elevation/NS_DEM_ascii.asc

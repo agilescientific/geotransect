@@ -6,9 +6,7 @@ Functions for plotting.
 :copyright: 2015 Agile Geoscience
 :license: Apache 2.0
 """
-import csv
 import os
-from functools import partial
 
 from PIL import Image
 import numpy as np
@@ -18,7 +16,6 @@ from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
 from matplotlib import gridspec
 from shapely.ops import transform
-import pyproj as pp
 
 from autowrap import on_draw
 import utils
@@ -328,6 +325,12 @@ def plot(tc):
                                 np.amax(coords) / 1000.0,
                                 tc.range[-1], 0],
                         aspect="auto", cmap=tc.seismic_cmap)
+
+    for horizon, data in tc.horizons.data.items():
+        print horizon, data
+        coords = tc.horizons.coords[horizon]
+        xsection.plot(coords, data)
+
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)

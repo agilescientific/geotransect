@@ -15,6 +15,23 @@ import pyproj as pp
 from shapely.ops import transform
 
 
+def nearest_point(p, plist):
+    """
+    Given a shapely Point, finds the nearest Point in a list of Points.
+
+    Args:
+        p (Point): A ``shapely`` Point.
+        plist (list): A list of Points.
+
+    Returns:
+        Point: The nearest Point.
+    """
+    p = (p.x, p.y)
+    plist = [(pt.x, pt.y) for pt in plist]
+    d_sq = np.sum((np.asarray(plist) - p)**2, axis=1)
+    return plist[np.argmin(d_sq)]
+
+
 def listdir(directory, match=None):
     """
     Wrapper for `os.listdir()` that returns full paths. A bit like
