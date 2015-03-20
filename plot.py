@@ -164,7 +164,7 @@ def plot(tc):
     # Right-hand column.
     log_header = fig.add_subplot(gs[0:1, -1*fw:])
     # log_plot is dealt with by passing gs to feature_plot.plot_feature_well()
-    logo = fig.add_subplot(gs[-1:, -1*fw:])
+    #logo = fig.add_subplot(gs[-1:, -1*fw:])
 
     # Adjust white space between subplots (maybe put in function?)
     # ------------------------------------------------------------ #
@@ -200,7 +200,7 @@ def plot(tc):
 
     # Meta description
     header.text(1.0, 0.5 + dy,
-                (tc.basin),
+                (tc.subtitle),
                 fontsize=14,
                 horizontalalignment='right',
                 verticalalignment='bottom')
@@ -270,14 +270,6 @@ def plot(tc):
     line_t = utils.utm2lola(tc.data)
     plot_line(m, line_t, colour='r', lw=3)
 
-    # Small scale map
-    # ---------------------------------------------------------#
-    # small_scale.plot(tx, ty)
-    # small_scale.patch.set_facecolor("0.95")
-    # small_scale.patch.set_edgecolor("0.90")
-    # small_scale.set_xticks([])
-    # small_scale.set_yticks([])
-
     # Elevation and bedrock plot
     # -----------------------------------------------------------#
     for i, geo in enumerate(tc.bedrock.data[:-1]):
@@ -291,8 +283,6 @@ def plot(tc):
         hsv = np.array([[geo["AV_HUE"], geo["AV_SAT"],
                          geo["AV_VAL"]]]).reshape(1, 1, 3)
         color = hsv_to_rgb(hsv / 255.)
-        # elevation.plot(tc.elevation.coords[idx], tc.elevation.data[idx],
-        #                linewidth=3, color=color.flatten())
 
         elevation.bar(tc.elevation.coords[idx],
                       tc.elevation.data[idx],
@@ -311,6 +301,8 @@ def plot(tc):
     elevation.patch.set_alpha(0.1)
     elevation.set_ylabel("Elevation [m]", fontsize=8)
     elevation.grid(True)
+    elevation.tick_params(axis='x', which='major', labelsize=0)
+    elevation.xaxis.grid(True, which='major')
     elevation.text(0.0, .5*max_height,
                    "Surface geology",
                    props,
@@ -338,6 +330,7 @@ def plot(tc):
     xsection.set_ylabel("Depth [m]", fontsize=8)
     xsection.tick_params(axis='y', which='major', labelsize=8)
     xsection.tick_params(axis='x', which='major', labelsize=0)
+    xsection.xaxis.grid(True, which='major')
     xsection.grid(True)
     xsection.set_frame_on(False)
 
@@ -370,13 +363,10 @@ def plot(tc):
                      fontsize=10,
                      color='k')
 
+    potfield.axis(plot_axis)
     potfield.set_xlim(tc.extents[:2])
     potfield.set_frame_on(False)
     potfield.set_yticks([])
-
-    plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
-                 tc.extents[2], tc.extents[3]]
-    potfield.axis(plot_axis)
     potfield.xaxis.grid(True, which='major')
     potfield.tick_params(axis='x', which='major', labelsize=10)
     potfield.set_xlabel("Transect range [km]", fontsize=10)
@@ -458,23 +448,31 @@ def plot(tc):
 
     # Logo
     # --------------------------------------------------------------#
+    # path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
+    # im = Image.open(path)
+    # im = np.array(im).astype(np.float) / 255
+
+    # logo.axhline(y=0.7,
+    #              xmin=0.1,
+    #              xmax=0.9,
+    #              linewidth=1,
+    #              color='k')
+    # logo.imshow(im)
+    # logo.axis("off")
+
     path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
     im = Image.open(path)
+    #im = im.thumbnail((100,100), Image.ANTIALIAS)
+    w, h = im.size
+
+    # We need a float array between 0-1, rather than
+    # a uint8 array between 0-255
     im = np.array(im).astype(np.float) / 255
 
-    # # Place in axis:
-    # logo.text(0.1, 0.7,
-    #           ("Department of Energy, Nova Scotia, Canada"),
-    #           verticalalignment='top',
-    #           horizontalalignment='left')
-
-    logo.axhline(y=0.7,
-                 xmin=0.1,
-                 xmax=0.9,
-                 linewidth=1,
-                 color='k')
-    logo.imshow(im)
-    logo.axis("off")
+    # With newer (1.0) versions of matplotlib, you can
+    # use the "zorder" kwarg to make the image overlay
+    # the plot, rather than hide behind it... (e.g. zorder=10)
+    fig.figimage(im, fig.bbox.xmax - w, fig.bbox.ymax - h)
 
     # Finish
     # --------------------------------------------------------------#

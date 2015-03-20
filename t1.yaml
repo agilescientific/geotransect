@@ -6,19 +6,20 @@
 # Containers it contains, so you have access to them everywhere. 
 params:
     title: Transect 1
-    basin: Windsor  # We should get this from the basins shapefile 
+    subtitle: Windsor Basin
     id: 1
-    description: This transect is the one we are using to test this module. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+    description: Transect used for testing geotransect.
     domain: time
     range:
         - 0
         - 3000
     dz: 25  # Needed for depth conversion
     data_dir: /Users/matt/Dropbox/geotransect_test/data
-    feature_well: P-129
     seismic_cmap: Greys  # http://ageo.co/modelrcolour
     seismic_log: GR
     seismic_log_colour: lime
+    feature_well: P-129
+    striplog: lithology
     settings: !include settings.yaml
 
 # Data strings are always interpreted as paths relative to data_dir in params.
@@ -59,7 +60,7 @@ map_layers:  # In layer order, top = first
         alpha: 0.67
     wells:
         file: wells/wells.shp
-        colour: black
+        colour: green
         alpha: 0.67
     seismic:
         file: seismic/seismic_lines.shp

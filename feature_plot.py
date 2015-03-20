@@ -12,6 +12,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
+from striplog import Legend
 
 import utils
 
@@ -48,13 +49,6 @@ def get_curve_params(abbrev, fname):
     return params
 
 
-def plot_striplog(ax, striplog, width=1,
-                  ladder=False, minthick=1,
-                  alpha=0.75):
-
-    pass
-
-
 def plot_feature_well(tc, gs):
     """
     Plotting function for the feature well.
@@ -84,11 +78,10 @@ def plot_feature_well(tc, gs):
     ntracks = 5.
     lw = 1.0
     smooth = True
-    has_striplog = True
     naxes = 0
     ncurv_per_track = np.zeros(ntracks)
 
-    if has_striplog:
+    if tc.striplog:
         ncurv_per_track[0] = 1
 
     for curve in curves:
@@ -99,18 +92,20 @@ def plot_feature_well(tc, gs):
     # Would like feature plot to have different wspace, but this adjusts all.
     # gs.update(wspace=0)
 
-    axss = plt.subplot(gs[2:-1, -5])
+    # To add a footer, add -1 after the colons, eg gs[2:-1,...]
+
+    axss = plt.subplot(gs[2:, -5])
     axs0 = [axss, axss.twiny()]
-    axs1 = [plt.subplot(gs[2:-1, -4])]
-    axs2 = [plt.subplot(gs[2:-1, -3])]
-    axs3 = [plt.subplot(gs[2:-1, -2])]
-    axs4 = [plt.subplot(gs[2:-1, -1])]
+    axs1 = [plt.subplot(gs[2:, -4])]
+    axs2 = [plt.subplot(gs[2:, -3])]
+    axs3 = [plt.subplot(gs[2:, -2])]
+    axs4 = [plt.subplot(gs[2:, -1])]
 
     axs = [axs0, axs1, axs2, axs3, axs4]
 
-    # striplog = tc.striplog.get(tc.feature_well)
-    # plot_striplog(axs0[0], striplog, width=5, alpha=0.75,
-    #               ladder=True)
+    if tc.striplog:
+        legend = Legend.default()
+        logs.striplog[tc.striplog].plot_axis(axs0[0], legend=legend)
 
     axs0[0].set_ylim([Z[-1], 0])
     label_shift = np.zeros(len(axs))
@@ -204,29 +199,11 @@ def plot_feature_well(tc, gs):
         # curve labels
         # ------------------------------------------------- #
 
-        # trans = transforms.blended_transform_factory(axs[i][j].transData,
-        #                                              axs[i][j].transData)
+        trans = transforms.blended_transform_factory(axs[i][j].transData,
+                                                     axs[i][j].transData)
 
-        # magic = -1 * Z[-1] / 15.
-        # axs[i][j].text(xpos, magic - (magic/5)*(label_shift[i]-1),
-        #                curve,
-        #                horizontalalignment='center',
-        #                verticalalignment='bottom',
-        #                fontsize=12, color=params['hexcolor'],
-        #                transform=trans)
-        # # curve units
-        # units = '${}$'.format(params['units'])
-        # if label_shift[i] <= 1:
-        #     axs[i][j].text(xpos, magic+20,
-        #                    units,
-        #                    horizontalalignment='center',
-        #                    verticalalignment='top',
-        #                    fontsize=12, color='k',
-        #                    transform=trans)
-
-        trans = transforms.blended_transform_factory(axs[i][j].transAxes,
-                                                     axs[i][j].transAxes)
-        axs[i][j].text(i/ntracks, -1.1 - 0.05*(label_shift[i]-1),
+        magic = -Z[-1] / 12.
+        axs[i][j].text(xpos, magic - (magic/4)*(label_shift[i]-1),
                        curve,
                        horizontalalignment='center',
                        verticalalignment='bottom',
@@ -235,7 +212,7 @@ def plot_feature_well(tc, gs):
         # curve units
         units = '${}$'.format(params['units'])
         if label_shift[i] <= 1:
-            axs[i][j].text(i/ntracks, -1.05,
+            axs[i][j].text(xpos, magic*0.5,
                            units,
                            horizontalalignment='center',
                            verticalalignment='top',

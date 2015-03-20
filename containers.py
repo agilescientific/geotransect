@@ -22,7 +22,7 @@ from shapely.ops import transform
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
 from agilegeo.avo import time_to_depth
-from striplog import Well
+from striplog import Well, Lexicon
 
 from plot import plot
 from sgy2shp import sgy2shp, ShapeFileExists
@@ -114,7 +114,6 @@ class TransectContainer(BaseContainer):
         self.horizons = HorizonContainer(data['horizon_dir'], params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
-        self.striplog = StriplogContainer(data['well_dir'], params)
         self.potfield = PotfieldContainer(potfields, params)
         self.locmap = LocmapContainer(layers, params)
 
@@ -135,7 +134,6 @@ class TransectContainer(BaseContainer):
         self.horizons.update(self.data)
         self.elevation.update(self.data)
         self.bedrock.update(self.data)
-        self.striplog.update(self.data)
         self.potfield.update(self.data)
         self.locmap.update(self.data)
 
@@ -738,6 +736,7 @@ class LogContainer(BaseContainer):
 
             pattern = "^" + name + ".*out.las"
             for fname in utils.walk(self.well_dir, pattern):
+                # This is a loop but there should only be one matching file.
                 well = Well(fname, null_subs=np.nan)
                 print well.curves.names
                 self.data.append(well)
@@ -745,6 +744,22 @@ class LogContainer(BaseContainer):
 
             if not self.log_lookup.get(name):
                 self.data.append(None)
+
+            sl_name = getattr(self, 'striplog', None)
+            sl = None
+            if sl_name and (name == self.feature_well):
+                lexicon = Lexicon.default()
+                pattern = "^" + name + ".*striplog.las"
+                for fname in utils.walk(self.well_dir, pattern):
+                    # Load the striplog.
+                    sl = Well(fname, lexicon=lexicon, null_subs=np.nan)
+
+                    # Add it to the well
+                    self.log_lookup[name].add_striplog(sl.striplog[sl_name],
+                                                       sl_name)
+            if not sl:
+                # Unset this so we can easily test for it later.
+                self.striplog = False
 
             self.coords.append(transect.project(point))
 
@@ -771,7 +786,7 @@ class VelocityContainer(SegyContainer):
     """
     Container for managing velocity profiles.
 
-    See SegyContainer
+    See SegyContainer.
     """
 
     def __init__(self, vel_dir, params):
