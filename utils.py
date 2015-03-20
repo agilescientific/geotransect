@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Defines various data containers for plotting a transect.
-
 :copyright: 2015 Agile Geoscience
 :license: Apache 2.0
 """
@@ -18,11 +17,9 @@ from shapely.ops import transform
 def nearest_point(p, plist):
     """
     Given a shapely Point, finds the nearest Point in a list of Points.
-
     Args:
         p (Point): A ``shapely`` Point.
         plist (list): A list of Points.
-
     Returns:
         Point: The nearest Point.
     """
@@ -36,10 +33,8 @@ def listdir(directory, match=None):
     """
     Wrapper for `os.listdir()` that returns full paths. A bit like
     `utils.walk()` but not recursive. Case insensitive.
-
     Args:
         directory (str): The directory to list.
-
     Yields:
         str: Full path to each file in turn.
     """
@@ -54,10 +49,8 @@ def walk(directory, match=None):
     """
     Find files whose names match some regex. Like `fnmatch` but with regex.
     Like `utils.listdir()` but recursive. Case insensitive.
-
     Args:
         directory (str): The directory to start at.
-
     Yields:
         str: Full path to each file in turn.
     """

@@ -327,9 +327,9 @@ def plot(tc):
                         aspect="auto", cmap=tc.seismic_cmap)
 
     for horizon, data in tc.horizons.data.items():
-        print horizon, data
+        print horizon, data.shape, np.nanmin(data), np.nanmax(data)
         coords = tc.horizons.coords[horizon]
-        xsection.plot(coords, data)
+        xsection.plot(coords, data, 'o', ms=50)
 
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
@@ -340,57 +340,6 @@ def plot(tc):
     xsection.tick_params(axis='x', which='major', labelsize=0)
     xsection.grid(True)
     xsection.set_frame_on(False)
-
-    # Log overlays
-    # --------------------------------------------------------#
-    if tc.locmap.layers.get('wells'):
-        if tc.locmap.layers['wells'].get('colour'):
-            well_colour = tc.locmap.layers['wells']['colour']
-        else:
-            well_colour = tc.settings.get('default_colour')
-            if not well_colour:
-                well_colour = 'k'
-
-    for name, las, pos in zip(tc.log.names, tc.log.data, tc.log.coords):
-        c = tc.seismic_log_colour
-        if las:
-            data = np.nan_to_num(las.data[tc.seismic_log])
-            data /= np.amax(data)
-            lgsc = 0.015  # hack to compress the log width
-            data *= lgsc * (tc.extents[1] - tc.extents[0])
-            data += pos - 0.5 * np.amax(data)
-            z = las.data['DEPT']
-            xsec_logs.axvline(x=pos,
-                              color=well_colour,
-                              alpha=0.25,
-                              ymin=0,
-                              ymax=z[-1])
-            xsec_logs.plot(data, z, c, lw=0.5, alpha=0.75)
-            xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
-            xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
-            xsec_logs.axis("off")
-        else:
-            # Need to get TD from SHP or well header sheet.
-            z = [tc.extents[2]-40]
-            xsec_logs.axvline(x=pos, color=well_colour, alpha=0.25)
-
-        elevation.axvline(x=pos, color=well_colour, alpha=0.25)
-        potfield.axvline(x=pos, color=well_colour, alpha=0.25)
-
-        # Well name annotation
-        xsec_logs.text(pos, 20,
-                       name,
-                       color=well_colour,
-                       va='top',
-                       ha='center',
-                       fontsize=12)
-
-    # Log type annotation, top left
-    xsec_logs.text(500, 20,
-                   tc.seismic_log+' log',
-                   color=c,
-                   va='top',
-                   fontsize=12)
 
     # Potential field data
     # -----------------------------------------------------------#
@@ -431,6 +380,67 @@ def plot(tc):
     potfield.xaxis.grid(True, which='major')
     potfield.tick_params(axis='x', which='major', labelsize=10)
     potfield.set_xlabel("Transect range [km]", fontsize=10)
+
+    # Log overlays
+    # --------------------------------------------------------#
+    if tc.locmap.layers.get('wells'):
+        if tc.locmap.layers['wells'].get('colour'):
+            well_colour = tc.locmap.layers['wells']['colour']
+        else:
+            well_colour = tc.settings.get('default_colour')
+            if not well_colour:
+                well_colour = 'k'
+
+    for name, las, pos in zip(tc.log.names, tc.log.data, tc.log.coords):
+        c = tc.seismic_log_colour
+
+        if name == tc.feature_well:
+            alpha, lw = 0.5, 1.5
+            weight = 'bold'
+        else:
+            alpha, lw = 0.25, 1.0
+            weight = 'normal'
+
+        if las:
+            data = np.nan_to_num(las.data[tc.seismic_log])
+            data /= np.amax(data)
+            lgsc = 0.015  # hack to compress the log width
+            data *= lgsc * (tc.extents[1] - tc.extents[0])
+            data += pos - 0.5 * np.amax(data)
+            z = las.data['DEPT']
+            xsec_logs.axvline(x=pos,
+                              color=well_colour,
+                              alpha=alpha,
+                              lw=lw,
+                              ymin=0,
+                              ymax=z[-1])
+            xsec_logs.plot(data, z, c, lw=0.5, alpha=0.75)
+            xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
+            xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
+            xsec_logs.axis("off")
+        else:
+            # Need to get TD from SHP or well header sheet.
+            z = [tc.extents[2]-40]
+            xsec_logs.axvline(x=pos, color=well_colour, alpha=0.25)
+
+        elevation.axvline(x=pos, color=well_colour, alpha=0.25)
+        potfield.axvline(x=pos, color=well_colour, alpha=0.25)
+
+        # Well name annotation
+        xsec_logs.text(pos, 20,
+                       name,
+                       color=well_colour,
+                       va='top',
+                       ha='center',
+                       fontsize=10,
+                       weight=weight)
+
+    # Log type annotation, top left
+    xsec_logs.text(500, 20,
+                   tc.seismic_log+' log',
+                   color=c,
+                   va='top',
+                   fontsize=12)
 
     #  Feature plot
     # -----------------------------------------------------#

@@ -21,15 +21,12 @@ from shapely.geometry import shape, Point
 from shapely.ops import transform
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
+from agilegeo.avo import time_to_depth
+from striplog import Well
 
-from las import LASReader
 from plot import plot
-from lithology.lithology import intervals_from_las3_string
 from sgy2shp import sgy2shp, ShapeFileExists
 import utils
-
-# from scipy.interpolate import interp1d
-from agilegeo.avo import time_to_depth
 
 
 class ContainerError(Exception):
@@ -117,7 +114,7 @@ class TransectContainer(BaseContainer):
         self.horizons = HorizonContainer(data['horizon_dir'], params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
-        self.striplog = StriplogContainer(data['striplog_dir'], params)
+        self.striplog = StriplogContainer(data['well_dir'], params)
         self.potfield = PotfieldContainer(potfields, params)
         self.locmap = LocmapContainer(layers, params)
 
@@ -133,9 +130,9 @@ class TransectContainer(BaseContainer):
         print "\n+++++++++++++++++++++++++++++++++\nUPDATING"
         # update the containers
         self.velocity.update(self.data)
+        self.log.update(self.data)
         self.seismic.update(self.data)
         self.horizons.update(self.data)
-        self.log.update(self.data)
         self.elevation.update(self.data)
         self.bedrock.update(self.data)
         self.striplog.update(self.data)
@@ -193,7 +190,7 @@ class LocmapContainer(BaseContainer):
         x_adj, y_adj = 0, 0
         if h > (w/aspect):
             x_adj = ((aspect*h) - w) / 2.  # Aspect is hard-coded in uberplot
-        else:                              # TODO Fix that!
+        else:
             y_adj = ((w/aspect) - h) / 2.
 
         utm_nad83 = pp.Proj("+init=EPSG:26920")
@@ -525,7 +522,7 @@ class HorizonContainer(BaseContainer):
             this_lookup = {}
             for s in samples:
                 line, cdp, x, y, t, surv = s.split()
-                x, y = float(x), float(y)
+                x, y = int(float(x)), int(float(y))
                 t = float(t)
                 this_lookup[Point(x, y)] = t
 
@@ -541,10 +538,11 @@ class HorizonContainer(BaseContainer):
 
         for horizon, lookup in self.lookup.items():
 
-            print horizon, len(lookup),
+            print horizon, len(lookup), lookup.keys()[10], lookup[lookup.keys()[10]]
 
             # Prepare results.
-            self.data[horizon] = np.zeros(self.nsamples)
+            self.data[horizon] = np.empty(self.nsamples)
+            self.data[horizon][:] = np.nan
             self.coords[horizon] = self.linspace
 
             b = self.settings['buffer']
@@ -557,11 +555,13 @@ class HorizonContainer(BaseContainer):
                 # inspect. but it's still way way slow.
                 prepared = prep(p.buffer(b))
                 points = filter(prepared.contains, lookup.keys())
-                print len(points)
+                print len(points),
 
                 if points:
                     pi = utils.nearest_point(p, points)
-                    self.data[horizon][n] = lookup.get(pi, 0)
+                    print pi
+                    d = lookup.get(pi, np.nan)
+                    self.data[horizon][n] = d
 
 
 class PotfieldContainer(BaseContainer):
@@ -689,21 +689,22 @@ class LogContainer(BaseContainer):
     Container for managing and plotting LAS data.
 
     Args:
-        las_dir (str): Directory shape files of LAS headers.
+        well_dir (str): Directory shape files of LAS headers.
 
     Example:
-        >>> las_dir = 'wells/logs/'
+        >>> well_dir = 'wells/logs/'
         >>> params = {'domain': 'depth', 'buffer': 300, ... }
-        >>> lc = LogContainer(las_dir, params)
+        >>> lc = LogContainer(well_dir, params)
     """
-    def __init__(self, las_dir, params):
+    def __init__(self, well_dir, params):
 
         # First generate the parent object.
         super(LogContainer, self).__init__(params)
 
+        self.well_dir = well_dir
         self.reset_all()
 
-        for shp in utils.walk(las_dir, '\\.shp$'):
+        for shp in utils.walk(well_dir, '\\.shp$'):
             with fiona.open(shp, "r") as wells:
                 for well in wells:
                     shp = shape(well['geometry'])
@@ -735,17 +736,14 @@ class LogContainer(BaseContainer):
             self.names.append(name)
             print name,
 
-            # TODO: This has to be more dynamic
-            filename = os.path.join(self.data_dir, 'wells', name,
-                                    'wireline_log', name +
-                                    '_out.LAS')
-
-            if os.path.exists(filename):
-                well = LASReader(filename, null_subs=np.nan)
+            pattern = "^" + name + ".*out.las"
+            for fname in utils.walk(self.well_dir, pattern):
+                well = Well(fname, null_subs=np.nan)
                 print well.curves.names
                 self.data.append(well)
                 self.log_lookup[name] = self.data[-1]
-            else:
+
+            if not self.log_lookup.get(name):
                 self.data.append(None)
 
             self.coords.append(transect.project(point))
@@ -767,54 +765,6 @@ class LogContainer(BaseContainer):
             return points[index]
         else:
             return None
-
-
-class StriplogContainer(LogContainer):
-
-    def __init__(self, striplog_dir, params):
-
-        # First generate the parent object.
-        super(LogContainer, self).__init__(params)
-
-        self.reset_all()
-
-        pass
-
-    def update(self, transect):
-        print "\nUpdating", self.__class__.__name__
-
-        # Preprocess
-        prepared = prep(transect.buffer(self.settings['buffer']))
-
-        # Get the intersecting points
-        points = filter(prepared.contains, self.lookup.keys())
-
-        self.reset_data()
-
-        for point in points:
-
-            meta = self.lookup[point]
-
-            name = meta["name"]
-            filename = os.path.join('data', 'wells', name,
-                                    'lithology_log', name +
-                                    '_striplog.las')
-
-            # Write out an error log?
-            if not os.path.exists(filename):
-                continue
-
-            # store the transecting data
-            data = LASReader(filename, null_subs=np.nan,
-                             unknown_as_other=True)
-
-            self.data.append(intervals_from_las3_string(data.other))
-            self.coords.append(transect.project(point))
-            self.log_lookup[name] = self.data[-1]
-
-    def plot(self):
-
-        self.data.plot()
 
 
 class VelocityContainer(SegyContainer):

@@ -48,22 +48,6 @@ def get_curve_params(abbrev, fname):
     return params
 
 
-def get_tops(fname):
-    """
-    Takes a tops_dictionary for plotting in the logs tracks.
-
-    Args:
-        fname (str): The path to a file containing the tops.
-    """
-    tops = {}
-    with open(fname) as f:
-        for line in f.readlines():
-            if not line.startswith('#'):
-                temp = line.strip().split(',')
-                tops[temp[0]] = float(temp[1])
-    return tops
-
-
 def plot_striplog(ax, striplog, width=1,
                   ladder=False, minthick=1,
                   alpha=0.75):
@@ -97,7 +81,7 @@ def plot_feature_well(tc, gs):
               'DRHO']
 
     window = 51    # window length for smoothing must be an odd integer
-    ntracks = 5
+    ntracks = 5.
     lw = 1.0
     smooth = True
     has_striplog = True
@@ -220,11 +204,29 @@ def plot_feature_well(tc, gs):
         # curve labels
         # ------------------------------------------------- #
 
-        trans = transforms.blended_transform_factory(axs[i][j].transData,
-                                                     axs[i][j].transData)
+        # trans = transforms.blended_transform_factory(axs[i][j].transData,
+        #                                              axs[i][j].transData)
 
-        magic = -1 * Z[-1] / 15.
-        axs[i][j].text(xpos, magic - (magic/5)*(label_shift[i]-1),
+        # magic = -1 * Z[-1] / 15.
+        # axs[i][j].text(xpos, magic - (magic/5)*(label_shift[i]-1),
+        #                curve,
+        #                horizontalalignment='center',
+        #                verticalalignment='bottom',
+        #                fontsize=12, color=params['hexcolor'],
+        #                transform=trans)
+        # # curve units
+        # units = '${}$'.format(params['units'])
+        # if label_shift[i] <= 1:
+        #     axs[i][j].text(xpos, magic+20,
+        #                    units,
+        #                    horizontalalignment='center',
+        #                    verticalalignment='top',
+        #                    fontsize=12, color='k',
+        #                    transform=trans)
+
+        trans = transforms.blended_transform_factory(axs[i][j].transAxes,
+                                                     axs[i][j].transAxes)
+        axs[i][j].text(i/ntracks, -1.1 - 0.05*(label_shift[i]-1),
                        curve,
                        horizontalalignment='center',
                        verticalalignment='bottom',
@@ -233,7 +235,7 @@ def plot_feature_well(tc, gs):
         # curve units
         units = '${}$'.format(params['units'])
         if label_shift[i] <= 1:
-            axs[i][j].text(xpos, magic+20,
+            axs[i][j].text(i/ntracks, -1.05,
                            units,
                            horizontalalignment='center',
                            verticalalignment='top',
@@ -287,7 +289,7 @@ def plot_feature_well(tc, gs):
     try:
         tops_fname = os.path.join(tc.data_dir, tc.tops_file)
         if os.path.exists(tops_fname):
-            tops = get_tops(tops_fname)
+            tops = utils.get_tops(tops_fname)
             topx = get_curve_params('DT', fname)
             topmidpt = np.amax((topx)['xright'])
 
