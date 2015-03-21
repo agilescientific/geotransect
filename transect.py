@@ -70,6 +70,12 @@ def complete_paths(dictionary, root):
     return dictionary
 
 
+def complete_vel_paths(dictionary, root):
+
+    if dictionary["type"] != 'constant':
+        dictionary["data"] = os.path.join(root, dictionary["data"])
+
+    return dictionary
 def complete_map_paths(dictionary, root):
     """
     The map dictionary is a bit more complicated.
@@ -121,6 +127,7 @@ def main(ymlfile):
     kwargs['params'] = cfg['params']
     root = cfg['params']['data_dir']
     kwargs['data'] = complete_paths(cfg['data'], root)
+    kwargs['velocity'] = complete_vel_paths(cfg['velocity'], root)
     kwargs['layers'] = complete_map_paths(cfg['map_layers'], root)
     kwargs['potfields'] = complete_pot_paths(cfg['potfields'], root)
 

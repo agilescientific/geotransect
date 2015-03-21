@@ -21,7 +21,8 @@ from shapely.geometry import shape, Point
 from shapely.ops import transform
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
-from agilegeo.avo import time_to_depth
+
+
 from striplog import Well, Lexicon
 
 from plot import plot
@@ -82,6 +83,7 @@ class TransectContainer(BaseContainer):
         layers = kwargs.get('layers')
         potfields = kwargs.get('potfields')
         data = kwargs.get('data')
+        velocity = kwargs.get('velocity')
 
         super(TransectContainer, self).__init__(params)
 
@@ -107,7 +109,7 @@ class TransectContainer(BaseContainer):
 
         self.tops_file = data['tops_file']
         self.log = LogContainer(data['well_dir'], params)
-        self.velocity = VelocityContainer(data['velocity_dir'], params)
+        self.velocity = velocity_factory(velocity, params)
         self.seismic = SeismicContainer(data['seismic_dir'],
                                         self.velocity,
                                         params)
@@ -374,7 +376,8 @@ class SegyContainer(BaseContainer):
         for f in utils.listdir(segy_dir, '\\..+\\.shp$'):
             with fiona.open(f, "r") as traces:
                 for trace in traces:
-                    self.lookup[shape(trace["geometry"])] = trace["properties"]
+                    self.lookup[shape(trace["geometry"])] = \
+                      trace["properties"]
 
     def update(self, transect, flat=False):
         """
@@ -782,7 +785,181 @@ class LogContainer(BaseContainer):
             return None
 
 
-class VelocityContainer(SegyContainer):
+class VelocityError(Exception):
+    pass
+
+class ConstantVelocityContainer(BaseContainer):
+    """
+    Class for handling constant velocity models
+    """
+
+    def __init__(self, velocity, params):
+
+        super(ConstantVelocityContainer, self).__init__(params)
+
+        self.velocity = velocity
+        
+    def update(self, transect):
+        """
+        Does nothing, velocity is constant
+        """
+        pass
+
+    def time2depth(self, data, point, dt, dz):
+        """
+        Converts a data array from time to depth
+        
+        Args:
+            data (array, 1d): A 1D numpy array.
+            point (float):  distance along transect corresponding to
+            the trace location. Not actually used, as this model
+            assumes a constant velocity
+
+            dt (float): The sample interval of the input data.
+            dz (float): The sample interval of the depth converted
+                        data.
+        """
+
+        return time_to_depth(data,self.data, dt, dz)
+
+    def depth2time(self, data, point, dz, dt):
+        """
+        Converts a data array the depth domain to the time
+        domain.
+        
+        Args:
+            data (array, 1d): A 1D numpy array.
+            point (float):  distance along transect corresponding to
+            the trace location. Not actually used, as this model
+            assumes a constant velocity
+
+            dz (float): The sample interval of the input data.
+            dt (float): The sample interval of the converted
+                        data.
+        """
+        return depth_to_time(data, self.data, dz, dt)
+
+class SimpleVelocityContainer(BaseContainer):
+    """
+    Class for handling simple velocity profiles read from csv/text
+    files. Simple example below, # are not parsed and are used as
+    comments.
+
+    
+    coordinates, 150,20.25
+
+    # time [s], depth [m]
+    0, 0
+    1000, 1000
+    2000, 2000
+    3000, 3000
+
+    """
+    def __init__(self, vel_dir, params):
+
+        # Initialize the base class
+        super(SimpleVelocityContainer,self).__init__(params)
+
+        self.profiles = {}
+        for profile in fnmatch.filter(os.listdir(vel_dir), '*.vel'):
+
+            with open(os.path.join(vel_dir, profile), 'r') as f:
+
+                # Read the location out of the file
+                header = false
+                loc = None
+                while not header:
+                    
+                    l = f.readline().lstrip()
+                    if l.startswith('#'):
+                        pass
+                    elif l.startswith('coordinates'):
+                        x,y = l.split(',')[1:]
+                        x = float(x)
+                        y = float(y)
+
+                        loc = Point((x,y))
+                        header = True
+
+
+                # build up the time depth profile
+                self.profiles[loc] = []
+                for line in f.readlines():
+
+                    # Ignore comments
+                    if line.strip().startswith('#'):
+                        continue
+
+                    time, depth = line.strip().split(',')
+
+                    self.profiles.append([float(time), float(depth)])
+
+    
+    def update(self, transect):
+
+        self.data = []
+        self.coords = []
+
+        # Grab the closest velocity profile for each point
+        for transect_point in transect.coords:
+            min_dist = np.Inf
+            for point in self.profiles.keys():
+
+                if((point[0]-tracsect_point[0])**2 +
+                   (point[1] - transect_point[1])**2) < min_dist:
+
+                    # update the data
+                    self.data.append(np.array.self.profile[point])
+                    self.coords.append(transect.project(point))
+
+    def time2depth(self, data, point, dt, dz):
+
+        # Find the nearest profile
+        coords = np.array(self.coords)
+        closest = np.abs(coords - point).argmin()
+
+        time = self.data[closest][0,:]
+        depth = self.data[closest][1,:]
+
+        vavg = depth / time
+
+        # resample vavg to match the data
+        input_time = np.arange(data.size) * dt
+
+        vavg = np.interp(input_time, time, vavg, vavg[0], vavg[1])
+
+        # calculate the z axis
+        z_in = vavg * input_time
+        z_out = np.arange(z_in[0], z_in[1], dz)
+
+        # do the conversion
+        return np.interp(z_out, z_in, data, data[0], data[1])
+
+    def depth2time(self, data, point, dz, dt):
+        
+        # Find the nearest profile
+        coords = np.array(self.coords)
+        closest = np.abs(coords - point).argmin()
+
+        time = self.data[closest][0,:]
+        depth = self.data[closest][1,:]
+
+        vavg = depth / time
+
+        # resample vavg to match the data
+        input_depth = np.arange(data.size) * dz
+
+        vavg = np.interp(input_depth, depth, vavg, vavg[0], vavg[1])
+
+        # calculate the z axis
+        t_in = vavg / input_depth
+        t_out = np.arange(t_in[0], t_in[1], dt)
+
+        # do the conversion
+        return np.interp(t_out, t_in, data, data[0], data[1])
+                    
+                    
+class SegyVelocityContainer(SegyContainer):
     """
     Container for managing velocity profiles.
 
@@ -790,10 +967,10 @@ class VelocityContainer(SegyContainer):
     """
 
     def __init__(self, vel_dir, params):
-        super(VelocityContainer, self).__init__(vel_dir, params)
+        super(SegyVelocityContainer, self).__init__(vel_dir, params)
 
     def update(self, transect):
-        super(VelocityContainer, self).update(transect, flat=True)
+        super(SegyVelocityContainer, self).update(transect, flat=True)
 
     def time2depth(self, trace, point, dt, dz):
         """
@@ -811,8 +988,7 @@ class VelocityContainer(SegyContainer):
         seismic = np.array(trace)
 
         # HACK TO MAKE FAKE VELOCITIES
-        r = np.random.randn(profile.data.size)
-        velocity = np.array(r * 100.0 + 2000)
+        velocity = np.ones(profile.data.size) *2000.0
 
         print idx+1, 'of', len(self.coords)
         samp = profile.stats["sampling_rate"]
@@ -820,10 +996,37 @@ class VelocityContainer(SegyContainer):
 
         t = np.arange(seismic.size)*dt
 
-        velocity = np.interp(t, vel_t, velocity, velocity[0], velocity[-1])
+        velocity = np.interp(t, vel_t, velocity, velocity[0],
+                             velocity[-1])
 
         z = np.arange(self.range[0], self.range[1], dz)
 
         data = time_to_depth(seismic, velocity, t, z)
 
         return data
+
+
+def velocity_factory(model_params, params):
+    """
+    Factory function for returning a VelocityContainer matching the
+    given params
+    """
+
+ 
+    if model_params["type"] == "constant":
+
+        return ConstantVelocityContainer(model_params["data"],
+                                         params)
+
+    elif model_params["type"] == "segy":
+
+        return SegyVelocityContainer(model_params["data"],
+                                     params)
+
+    elif model_params["type"] == "simple":
+
+        return SimpleVelocityContainer(model_params["data"],
+                                       params)
+    else: raise VelocityError("Invalid velocity type")
+
+                

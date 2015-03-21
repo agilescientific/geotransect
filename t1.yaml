@@ -14,7 +14,7 @@ params:
         - 0
         - 3000
     dz: 25  # Needed for depth conversion
-    data_dir: /Users/matt/Dropbox/geotransect_test/data
+    data_dir: data
     seismic_cmap: Greys  # http://ageo.co/modelrcolour
     seismic_log: GR
     seismic_log_colour: lime
@@ -30,12 +30,15 @@ data:
     transect_file: transects/Transects.shp
     seismic_dir: seismic
     horizon_dir: horizons
-    velocity_dir: velocity
     well_dir: wells
     elevation_file: elevation/NS_DEM_ascii.asc
     bedrock_dir: bedrock
     basins_dir: basins  # Not currently used
     tops_file: wells/P-129_tops.txt  # Need to make this dynamic, or just handle in well
+
+velocity:
+    type: constant # (segy, constant, simple)
+    data: 2000 # (data_dir, float, data_dir)
 
 potfields:
     Bouger:
