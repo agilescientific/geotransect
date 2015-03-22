@@ -319,7 +319,6 @@ def plot(tc):
                         aspect="auto", cmap=tc.seismic_cmap)
 
     for horizon, data in tc.horizons.data.items():
-        print horizon, data.shape, np.nanmin(data), np.nanmax(data)
         coords = tc.horizons.coords[horizon]
         xsection.plot(coords, data, 'o', ms=50)
 
@@ -462,7 +461,7 @@ def plot(tc):
 
     path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
     im = Image.open(path)
-    #im = im.thumbnail((100,100), Image.ANTIALIAS)
+    im = im.thumbnail((100,100), Image.ANTIALIAS)
     w, h = im.size
 
     # We need a float array between 0-1, rather than
@@ -477,3 +476,4 @@ def plot(tc):
     # Finish
     # --------------------------------------------------------------#
     plt.show()
+    #plt.savefig("test.png")

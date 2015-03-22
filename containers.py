@@ -17,7 +17,7 @@ import numpy as np
 import pyproj as pp
 import rasterio
 import fiona
-from shapely.geometry import shape, Point
+from shapely.geometry import shape, Point, MultiPoint
 from shapely.ops import transform
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
@@ -29,6 +29,7 @@ from plot import plot
 from sgy2shp import sgy2shp, ShapeFileExists
 import utils
 
+import fnmatch
 
 class ContainerError(Exception):
     pass
@@ -113,7 +114,9 @@ class TransectContainer(BaseContainer):
         self.seismic = SeismicContainer(data['seismic_dir'],
                                         self.velocity,
                                         params)
-        self.horizons = HorizonContainer(data['horizon_dir'], params)
+        self.horizons = HorizonContainer(data['horizon_dir'],
+                                         self.velocity,
+                                         params)
         self.elevation = ElevationContainer(data['elevation_file'], params)
         self.bedrock = BedrockContainer(data['bedrock_dir'], params)
         self.potfield = PotfieldContainer(potfields, params)
@@ -498,6 +501,8 @@ class HorizonContainer(BaseContainer):
 
     Args:
         hor_dir (str): Input directory containing seismic SEGY files.
+        velocity (Object): A velocity container for time-depth
+                           conversion.
         params (dict): The parameters, as specified in the config.
 
     Example:
@@ -506,11 +511,13 @@ class HorizonContainer(BaseContainer):
         >>> seis = seismicContainer(seis_dir, params)
     """
 
-    def __init__(self, hor_dir, params):
+    def __init__(self, hor_dir, velocity, params):
 
         # First generate the parent object.
         super(HorizonContainer, self).__init__(params)
 
+        self.velocity = velocity
+        
         self.data = {}
         self.coords = {}
 
@@ -520,51 +527,55 @@ class HorizonContainer(BaseContainer):
             with open(fname) as f:
                 samples = f.readlines()
             name = samples.pop(0).strip().strip('#')
-            this_lookup = {}
+            points = []
             for s in samples:
                 line, cdp, x, y, t, surv = s.split()
                 x, y = int(float(x)), int(float(y))
                 t = float(t)
-                this_lookup[Point(x, y)] = t
+                points.append((x,y,t))
 
             if self.lookup.get(name):
                 # Then it already exists so add to it.
-                self.lookup[name].update(this_lookup)
+                self.lookup[name] += points
             else:
                 # Then it's new data so grab what we have.
-                self.lookup[name] = this_lookup
+                self.lookup[name] = points
 
     def update(self, transect):
         print "\nUpdating", self.__class__.__name__
 
-        for horizon, lookup in self.lookup.items():
 
-            print horizon, len(lookup), lookup.keys()[10], lookup[lookup.keys()[10]]
+        # Make the transect into a 3d polygon
+        transect_points = []
+        for point in transect.coords:
 
-            # Prepare results.
-            self.data[horizon] = np.empty(self.nsamples)
-            self.data[horizon][:] = np.nan
-            self.coords[horizon] = self.linspace
+            transect_points.append((point[0], point[1], 0))
+            transect_points.append((point[0], point[1], 100000))
 
-            b = self.settings['buffer']
-
-            # Having to decimate massively because it takes too long.
-            for n, i in enumerate(self.coords[horizon][::100]):
-                p = transect.interpolate(i)
-
-                # This should drastically reduce the number of points to
-                # inspect. but it's still way way slow.
-                prepared = prep(p.buffer(b))
-                points = filter(prepared.contains, lookup.keys())
-                print len(points),
-
-                if points:
-                    pi = utils.nearest_point(p, points)
-                    print pi
-                    d = lookup.get(pi, np.nan)
-                    self.data[horizon][n] = d
+        transect_polygon = MultiPoint(transect_points).convex_hull
+        
+        for horizon, points in self.lookup.items():
 
 
+            data = []
+            coords = []
+            
+            surface = MultiPoint(points).convex_hull
+           
+            intersect = transect_polygon.intersection(surface)
+
+            # this is the intersection, now just project into
+            # a range coordinate
+            for coord in intersect.exterior.coords:
+                coords.append(transect.project(Point(coord[0:2])))
+                ## TODO Depth conversion for a point
+                #data  = self.velocity(data[2], coords[-1], 1,1]
+                data.append(coord[2]) # depth
+
+            
+            self.data[horizon] = np.array(data)
+            self.coords[horizon] = np.array(coords)
+            
 class PotfieldContainer(BaseContainer):
     """
     Contains potential field data.
