@@ -8,7 +8,8 @@ Defines various data containers for plotting a transect.
 """
 import os
 from functools import partial
-
+import matplotlib
+matplotlib.use("WX")
 # Import required to avoid bug in Basemap
 from mpl_toolkits.basemap import Basemap
 
@@ -22,7 +23,7 @@ from shapely.ops import transform
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
 
-
+from agilegeo.avo import time_to_depth
 from striplog import Well, Lexicon
 
 from plot import plot
@@ -830,8 +831,9 @@ class ConstantVelocityContainer(BaseContainer):
             dz (float): The sample interval of the depth converted
                         data.
         """
-
-        return time_to_depth(data,self.data, dt, dz)
+        velocity = self.velocity
+        return time_to_depth(data,np.ones(data.size)*velocity,
+                             dt, dz)
 
     def depth2time(self, data, point, dz, dt):
         """
@@ -848,7 +850,10 @@ class ConstantVelocityContainer(BaseContainer):
             dt (float): The sample interval of the converted
                         data.
         """
-        return depth_to_time(data, self.data, dz, dt)
+
+        velocity = self.velocity
+        return depth_to_time(data, np.ones(data.size)*velocity,
+                             dz, dt)
 
 class SimpleVelocityContainer(BaseContainer):
     """
@@ -877,7 +882,7 @@ class SimpleVelocityContainer(BaseContainer):
             with open(os.path.join(vel_dir, profile), 'r') as f:
 
                 # Read the location out of the file
-                header = false
+                header = False
                 loc = None
                 while not header:
                     
@@ -885,6 +890,7 @@ class SimpleVelocityContainer(BaseContainer):
                     if l.startswith('#'):
                         pass
                     elif l.startswith('coordinates'):
+                      
                         x,y = l.split(',')[1:]
                         x = float(x)
                         y = float(y)
@@ -901,9 +907,11 @@ class SimpleVelocityContainer(BaseContainer):
                     if line.strip().startswith('#'):
                         continue
 
-                    time, depth = line.strip().split(',')
+                    if(len(line.strip().split(',')) == 2):
+                        time, depth = line.strip().split(',')
 
-                    self.profiles.append([float(time), float(depth)])
+                        self.profiles[loc].append([float(time),
+                                              float(depth)])
 
     
     def update(self, transect):
@@ -916,11 +924,11 @@ class SimpleVelocityContainer(BaseContainer):
             min_dist = np.Inf
             for point in self.profiles.keys():
 
-                if((point[0]-tracsect_point[0])**2 +
-                   (point[1] - transect_point[1])**2) < min_dist:
+                if((point.coords[0][0]-transect_point[0])**2 +
+                   (point.coords[0][1] - transect_point[1])**2) < min_dist:
 
                     # update the data
-                    self.data.append(np.array.self.profile[point])
+                    self.data.append(np.array(self.profiles[point]))
                     self.coords.append(transect.project(point))
 
     def time2depth(self, data, point, dt, dz):
@@ -929,9 +937,10 @@ class SimpleVelocityContainer(BaseContainer):
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
 
-        time = self.data[closest][0,:]
-        depth = self.data[closest][1,:]
+        time = self.data[closest][:,0]
+        depth = self.data[closest][:,1]
 
+        time[0] = time[1]
         vavg = depth / time
 
         # resample vavg to match the data
@@ -941,7 +950,7 @@ class SimpleVelocityContainer(BaseContainer):
 
         # calculate the z axis
         z_in = vavg * input_time
-        z_out = np.arange(z_in[0], z_in[1], dz)
+        z_out = np.arange(z_in[0], z_in[-1], dz)
 
         # do the conversion
         return np.interp(z_out, z_in, data, data[0], data[1])
@@ -952,9 +961,10 @@ class SimpleVelocityContainer(BaseContainer):
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
 
-        time = self.data[closest][0,:]
-        depth = self.data[closest][1,:]
+        time = self.data[closest][:,0]
+        depth = self.data[closest][:,0]
 
+        time[0] = time[1] # divide by zero hack
         vavg = depth / time
 
         # resample vavg to match the data
@@ -964,7 +974,7 @@ class SimpleVelocityContainer(BaseContainer):
 
         # calculate the z axis
         t_in = vavg / input_depth
-        t_out = np.arange(t_in[0], t_in[1], dt)
+        t_out = np.arange(t_in[0], t_in[-1], dt)
 
         # do the conversion
         return np.interp(t_out, t_in, data, data[0], data[1])
@@ -983,6 +993,36 @@ class SegyVelocityContainer(SegyContainer):
     def update(self, transect):
         super(SegyVelocityContainer, self).update(transect, flat=True)
 
+    def depth2time(self, trace, point, dz, dt):
+
+        distance = [(p - point)**2.0 for p in self.coords]
+        idx = np.argmin(distance)
+
+        profile = self.data[idx]
+        seismic = np.array(trace)
+
+        # HACK TO MAKE FAKE VELOCITIES
+        velocity = np.ones(profile.data.size) *2000.0
+
+        print idx+1, 'of', len(self.coords)
+        
+        samp = profile.stats["sampling_rate"]
+        vel_z = np.arange(velocity.size) * 1.0 / samp
+
+        z = np.arange(seismic.size)*dz
+
+        velocity = np.interp(z, vel_z, velocity, velocity[0],
+                             velocity[-1])
+
+        t = np.arange(self.range[0], self.range[1], dt)
+
+        data = time_to_depth(seismic, velocity, z, t,
+                             mode="cubic")
+
+        return data
+
+
+        
     def time2depth(self, trace, point, dt, dz):
         """
         Converts a seismic trace from time to depth.
@@ -1012,7 +1052,8 @@ class SegyVelocityContainer(SegyContainer):
 
         z = np.arange(self.range[0], self.range[1], dz)
 
-        data = time_to_depth(seismic, velocity, t, z)
+        data = time_to_depth(seismic, velocity, t, z,
+                             mode="cubic")
 
         return data
 
