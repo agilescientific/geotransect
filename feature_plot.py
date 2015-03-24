@@ -81,7 +81,7 @@ def plot_feature_well(tc, gs):
     naxes = 0
     ncurv_per_track = np.zeros(ntracks)
 
-    if tc.striplog:
+    if getattr(tc, 'striplog', None):
         ncurv_per_track[0] = 1
 
     for curve in curves:
@@ -103,9 +103,9 @@ def plot_feature_well(tc, gs):
 
     axs = [axs0, axs1, axs2, axs3, axs4]
 
-    if tc.striplog:
+    if getattr(tc, 'striplog', None):
         legend = Legend.default()
-        logs.striplog[tc.striplog].plot_axis(axs0[0], legend=legend)
+        logs.striplog[tc.log.striplog].plot_axis(axs0[0], legend=legend)
 
     axs0[0].set_ylim([Z[-1], 0])
     label_shift = np.zeros(len(axs))

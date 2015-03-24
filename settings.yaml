@@ -3,13 +3,14 @@
 # you have access to them everywhere. These items are available as follows:
 #    tc.settings['domain']
 # etc. The dictionary is an OrderedDict, so order is preserved everywhere.
-images_dir: images
+logo_file: images/logo.png
 raster_extensions:
     - tif
     - tiff
     - grd
     - asc
 buffer: 1000
+fine_buffer: 100
 map_padding: 10000
 default_colour: blue     # http://ageo.co/namedcolours
 default_cmap: gist_heat  # http://ageo.co/modelrcolour

@@ -13,8 +13,8 @@ params:
     range:
         - 0
         - 3000
-    dz: 25  # Needed for depth conversion
-    data_dir: data
+    dz: 4  # Needed for depth conversion
+    data_dir: /Users/matt/Dropbox/geotransect_test/data
     seismic_cmap: Greys  # http://ageo.co/modelrcolour
     seismic_log: GR
     seismic_log_colour: lime
@@ -37,8 +37,8 @@ data:
     tops_file: wells/P-129_tops.txt  # Need to make this dynamic, or just handle in well
 
 velocity:
-    type: constant # (segy, constant, simple)
-    data: 3000 # (data_dir, float, data_dir)
+    type: constant # (segy (dir), constant (float), simple(dir))
+    data: 2500
 
 potfields:
     Bouger:
@@ -50,9 +50,8 @@ potfields:
             - -25  # ymin
     Canada_200m:
         file: potfield/canada200m_rtf_may2014_UTM.GRD
-        colour: potfield/r154nsboug.grd
-        cmap: jet
-        #clip: 99
+        colour: red
+        clip: 99
         decimate: 1
 
 # TODO: Only use one level of nesting

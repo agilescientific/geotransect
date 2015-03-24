@@ -16,120 +16,12 @@ from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
 from matplotlib import gridspec
 from shapely.ops import transform
+from matplotlib.ticker import ScalarFormatter
 
 from autowrap import on_draw
 import utils
 from feature_plot import plot_feature_well
-
-
-def plot_line(m, line, colour='b', lw=1, alpha=1):
-    """
-    Plots a line given a line with lon,lat coordinates.
-
-    Note:
-        This means you probably have to call shapely `transform` on your
-        line before passing it to this function.
-
-        There is a helper partial function in utils called `utm2lola` which
-        makes this easy.
-
-    Args:
-        m (Basemap): A matplotlib Basemap.
-        line (shape): A shapely geometry.
-        colour (str): A colour from the matplotlib dictionary.
-
-    Returns:
-        List: A list of matplotlib lines.
-    """
-    lo, la = line.xy
-    x, y = m(lo, la)
-    return m.plot(x, y,
-                  color=colour,
-                  linewidth=lw,
-                  alpha=alpha,
-                  solid_capstyle='round')
-
-
-def plot_point(m, point, colour='b', shape='o', alpha=1, zorder=None):
-    """
-    Plots a point given a point with lon,lat coordinates.
-
-    Note:
-        This means you probably have to call shapely `transform` on your
-        point before passing it to this function.
-
-        There is a helper partial function in utils called `utm2lola` which
-        makes this easy.
-
-    Args:
-        m (Basemap): A matplotlib Basemap.
-        point (shape): A shapely geometry.
-        colour (str): A colour from the matplotlib dictionary.
-
-    Returns:
-        List: A list of matplotlib points.
-    """
-    lo, la = point.xy
-    x, y = m(lo, la)
-    return m.scatter(x, y,
-                     s=20,
-                     color=colour,
-                     alpha=alpha,
-                     zorder=zorder)
-
-
-def draw_basemap(m):
-    """
-    Puts some standard bits of decoration on a matplotlib Basemap.
-
-    Args:
-        m (Basemap): A matplotlib Basemap.
-
-    Returns:
-        m (Basemap): The newly decorated Basemap.
-    """
-    m.drawcoastlines(color='#9caf9c')
-    m.drawcountries()
-    m.fillcontinents(color='#d8e3d8')
-    m.drawmapboundary(color='gray')
-    m.drawmeridians(np.arange(0, 360, 1), color='gray')
-    m.drawparallels(np.arange(-90, 90, 1), color='gray')
-    return m
-
-
-def add_subplot_axes(ax, rect, axisbg='w'):
-    """
-    Facilitates the addition of a small subplot within another plot.
-
-    From: http://stackoverflow.com/users/2309442/pablo
-    License: CC-BY-SA
-
-    Args:
-        ax (axis): A matplotlib axis.
-        rect (list): A rect specifying [left pos, bottom pos, with, height]
-
-    Returns:
-        axis: The sub-axis in the specified position.
-    """
-    fig = plt.gcf()
-    box = ax.get_position()
-    width = box.width
-    height = box.height
-    inax_position = ax.transAxes.transform(rect[0:2])
-    transFigure = fig.transFigure.inverted()
-    infig_position = transFigure.transform(inax_position)
-    x = infig_position[0]
-    y = infig_position[1]
-    width *= rect[2]
-    height *= rect[3]  # <= Typo was here
-    subax = fig.add_axes([x, y, width, height], axisbg=axisbg)
-    x_labelsize = subax.get_xticklabels()[0].get_size()
-    y_labelsize = subax.get_yticklabels()[0].get_size()
-    x_labelsize *= rect[2]**0.5
-    y_labelsize *= rect[3]**0.5
-    subax.xaxis.set_tick_params(labelsize=x_labelsize)
-    subax.yaxis.set_tick_params(labelsize=y_labelsize)
-    return subax
+from plot_utils import *
 
 
 def plot(tc):
@@ -182,6 +74,7 @@ def plot(tc):
 
     # Header
     # ---------------------------------------------------------#
+    print "Header"
     header.axis("off")
     dy = 0.2
     header.text(0.0, 0.5 + dy, tc.title,
@@ -221,6 +114,7 @@ def plot(tc):
 
     # Map
     # ---------------------------------------------------------#
+    print "Locmap"
     tx, ty = tc.data.coords.xy
 
     res = 'h'   # c, l, i, h, f
@@ -272,6 +166,7 @@ def plot(tc):
 
     # Elevation and bedrock plot
     # -----------------------------------------------------------#
+    print "Elevation"
     for i, geo in enumerate(tc.bedrock.data[:-1]):
         lim1 = tc.bedrock.coords[i]
         lim2 = tc.bedrock.coords[i + 1]
@@ -296,45 +191,82 @@ def plot(tc):
     elevation.set_xlim(tc.extents[:2])
     elevation.set_yticks([0, int(max_height),
                           int(np.amax(tc.elevation.data))])
-    elevation.set_xticks([])
+    elevation.set_xticklabels([])
     elevation.tick_params(axis='y', which='major', labelsize=8)
     elevation.patch.set_alpha(0.1)
     elevation.set_ylabel("Elevation [m]", fontsize=8)
     elevation.grid(True)
     elevation.tick_params(axis='x', which='major', labelsize=0)
     elevation.xaxis.grid(True, which='major')
-    elevation.text(0.0, .5*max_height,
+    elevation.text(500, 0.8*max_height,
+                   "Elevation",
+                   props, va='bottom',
+                   fontsize=10)
+    elevation.text(500, 0.75*max_height,
                    "Surface geology",
-                   props,
+                   props, va='top',
                    fontsize=10)
     elevation.set_frame_on(False)
+    for tick in elevation.get_xaxis().get_major_ticks():
+        tick.set_pad(-8.)
+        tick.label1 = tick._get_text1()
 
     # Seismic cross section
     # ------------------------------------------------------------#
+    print "Seismic"
     for coords, data in zip(tc.seismic.coords, tc.seismic.data):
-        xsection.imshow(data,
-                        extent=[np.amin(coords) / 1000.0,
-                                np.amax(coords) / 1000.0,
-                                tc.range[-1], 0],
-                        aspect="auto", cmap=tc.seismic_cmap)
+        im = xsection.imshow(data,
+                             extent=[np.amin(coords) / 1000.0,
+                                     np.amax(coords) / 1000.0,
+                                     tc.range[-1], 0],
+                             aspect="auto", cmap=tc.seismic_cmap)
 
-    for horizon, data in tc.horizons.data.items():
+    # Horizons
+    colours = ['b', 'g', 'orange', 'c', 'magenta', 'pink']
+    for i, (horizon, data) in enumerate(tc.horizons.data.items()):
         coords = tc.horizons.coords[horizon]
-        xsection.plot(coords, data, 'o', ms=50)
+        xsection.scatter(coords/1000, data,
+                         color=colours[i],
+                         marker='.')
+
+        # labels
+        xsection.text(0.025, 0.025*(i+1),
+                      horizon,
+                      transform=xsection.transAxes,
+                      ha='left', color=colours[i],
+                      va='center', fontsize=12)
 
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
-    xsection.set_xticks([])
-    xsection.set_ylabel("Depth [m]", fontsize=8)
+    xsection.set_xticklabels([])
+    if tc.domain.lower() in ['depth', 'd']:
+        xsection.set_ylabel("Depth [m]", fontsize=8)
+    else:
+        xsection.set_ylabel("TWTT [ms]", fontsize=8)
     xsection.tick_params(axis='y', which='major', labelsize=8)
     xsection.tick_params(axis='x', which='major', labelsize=0)
+    xsection.yaxis.grid(True, which='major')
     xsection.xaxis.grid(True, which='major')
-    xsection.grid(True)
+    #xsection.grid(True)
     xsection.set_frame_on(False)
+
+    # Seismic colorbar
+    # extreme = max(np.amax(data), abs(np.amin(data)))
+    colorbar_ax = add_subplot_axes(xsection, [0.975, 0.025, 0.01, 0.1])
+    fig.colorbar(im, cax=colorbar_ax)
+    colorbar_ax.text(0.5, 0.9, "+", weight='bold',
+                     transform=colorbar_ax.transAxes,
+                     ha='center', color='white',
+                     va='center', fontsize=12)
+    colorbar_ax.text(0.5, 0.1, "-", weight='bold',
+                     transform=colorbar_ax.transAxes, color='k',
+                     ha='center', va='center', fontsize=12)
+    colorbar_ax.set_axis_off()
 
     # Potential field data
     # -----------------------------------------------------------#
+    print "Potfields"
     for i, (field, payload) in enumerate(tc.potfield.data.items()):
         bot = 1 - (i+1.)/n_grids
         height = (1./n_grids) - 0.05
@@ -346,7 +278,8 @@ def plot(tc):
                         c=payload['colour'],
                         cmap=payload['cmap'],
                         s=1,
-                        edgecolor='')
+                        edgecolor='',
+                        vmin=-50, vmax=150)
 
         this_ax.set_xlim(tc.extents[:2])
         this_ax.set_frame_on(False)
@@ -357,13 +290,19 @@ def plot(tc):
         if scale:
             this_ax.set_ylim(float(scale[1]), float(scale[0]))
         ymax = this_ax.get_ylim()[1]
-        this_ax.text(1000, ymax, field,
+        this_ax.text(500, ymax, field,
                      va='top',
                      fontsize=10,
                      color='k')
 
     potfield.axis(plot_axis)
-    potfield.set_xlim(tc.extents[:2])
+    #potfield.set_xlim([tc.extents[0] / 1000., tc.extents[1] / 1000.])
+
+    # Would be nice but doesn't seem to honour power limits.
+    #fmt = ScalarFormatter()
+    #fmt.set_powerlimits((-3, 3))
+    #potfield.xaxis.set_major_formatter(fmt)
+
     potfield.set_frame_on(False)
     potfield.set_yticks([])
     potfield.xaxis.grid(True, which='major')
@@ -372,6 +311,7 @@ def plot(tc):
 
     # Log overlays
     # --------------------------------------------------------#
+    print "Logs"
     if tc.locmap.layers.get('wells'):
         if tc.locmap.layers['wells'].get('colour'):
             well_colour = tc.locmap.layers['wells']['colour']
@@ -412,11 +352,11 @@ def plot(tc):
             z = [tc.extents[2]-40]
             xsec_logs.axvline(x=pos, color=well_colour, alpha=0.25)
 
-        elevation.axvline(x=pos, color=well_colour, alpha=0.25)
-        potfield.axvline(x=pos, color=well_colour, alpha=0.25)
+        elevation.axvline(x=pos, color=well_colour, alpha=alpha, lw=lw)
+        potfield.axvline(x=pos/1000, color=well_colour, alpha=alpha, lw=lw)
 
         # Well name annotation
-        xsec_logs.text(pos, 20,
+        elevation.text(pos, max_height-10,
                        name,
                        color=well_colour,
                        va='top',
@@ -433,6 +373,7 @@ def plot(tc):
 
     #  Feature plot
     # -----------------------------------------------------#
+    print "Feature plot"
     if tc.feature_well:
         log_header.text(0.0, 1.0,
                         ("Well " + tc.feature_well),
@@ -447,6 +388,7 @@ def plot(tc):
 
     # Logo
     # --------------------------------------------------------------#
+    print "Logo"
     # path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
     # im = Image.open(path)
     # im = np.array(im).astype(np.float) / 255
@@ -459,19 +401,23 @@ def plot(tc):
     # logo.imshow(im)
     # logo.axis("off")
 
-    path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
-    im = Image.open(path)
-    im = im.thumbnail((100,100), Image.ANTIALIAS)
-    w, h = im.size
+    # try:
+    #     path = os.path.join(tc.data_dir, tc.settings['logo_file'])
+    #     print path
+    #     im = Image.open(path)
+    #     im = im.thumbnail((100, 100), Image.ANTIALIAS)
+    #     w, h = im.size
+    # except IOError:
+    #     print "Image is missing", path
 
-    # We need a float array between 0-1, rather than
-    # a uint8 array between 0-255
-    im = np.array(im).astype(np.float) / 255
+    # # We need a float array between 0-1, rather than
+    # # a uint8 array between 0-255
+    # im = np.array(im).astype(np.float) / 255
 
-    # With newer (1.0) versions of matplotlib, you can
-    # use the "zorder" kwarg to make the image overlay
-    # the plot, rather than hide behind it... (e.g. zorder=10)
-    fig.figimage(im, fig.bbox.xmax - w, fig.bbox.ymax - h)
+    # # With newer (1.0) versions of matplotlib, you can
+    # # use the "zorder" kwarg to make the image overlay
+    # # the plot, rather than hide behind it... (e.g. zorder=10)
+    # fig.figimage(im, fig.bbox.xmax - w, fig.bbox.ymax - h)
 
     # Finish
     # --------------------------------------------------------------#

@@ -76,6 +76,8 @@ def complete_vel_paths(dictionary, root):
         dictionary["data"] = os.path.join(root, dictionary["data"])
 
     return dictionary
+
+
 def complete_map_paths(dictionary, root):
     """
     The map dictionary is a bit more complicated.

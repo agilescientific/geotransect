@@ -7,33 +7,75 @@ Defines various data containers for plotting a transect.
 :license: Apache 2.0
 """
 import os
+import fnmatch
 from functools import partial
-import matplotlib
-matplotlib.use("WX")
+
 # Import required to avoid bug in Basemap
 from mpl_toolkits.basemap import Basemap
 
+# Optional backend specification
+# import matplotlib; matplotlib.use("WX")
+
+# 3rd party
 import matplotlib.pyplot as plt
 import numpy as np
 import pyproj as pp
 import rasterio
 import fiona
-from shapely.geometry import shape, Point, MultiPoint
+from shapely.geometry import shape, Point
 from shapely.ops import transform
 from shapely.prepared import prep
 from obspy.segy.core import readSEGY
 
-from agilegeo.avo import time_to_depth
+# Other Agile libraries
+from agilegeo.avo import time_to_depth, depth_to_time
 from striplog import Well, Lexicon
 
 from plot import plot
 from sgy2shp import sgy2shp, ShapeFileExists
 import utils
 
-import fnmatch
 
 class ContainerError(Exception):
     pass
+
+
+class Notice(object):
+    """
+    Helper class to make printout more readable.
+    """
+    styles = {'HEADER': '\033[95m',
+              'INFO': '\033[94m',      # blue
+              'OK': '\033[92m',        # green
+              'WARNING': '\033[93m',   # red
+              'FAIL': '\033[91m',
+              'BOLD': '\033[1m'
+              }
+    ENDC = '\033[0m'
+
+    def __init__(self, string, style):
+        print self.styles[style] + string + self.ENDC
+
+    @classmethod
+    def warning(cls, string):
+        return cls(string, 'WARNING')
+
+    @classmethod
+    def header(cls, string):
+        return cls('\n'+string+'\n', 'HEADER')
+
+    @classmethod
+    def hr_header(cls, string):
+        hr = "\n+++++++++++++++++++++++++++++++++\n"
+        return cls(hr+string.upper(), 'HEADER')
+
+    @classmethod
+    def info(cls, string):
+        return cls('\n'+string, 'INFO')
+
+    @classmethod
+    def ok(cls, string):
+        return cls(string, 'OK')
 
 
 class BaseContainer(object):
@@ -77,9 +119,8 @@ class TransectContainer(BaseContainer):
     """
     def __init__(self, **kwargs):
 
-        print "Welcome to geotransect!"
-        print "+++++++++++++++++++++++++++++++++\nINITIALIZING"
-
+        Notice.header("Welcome to geotransect!")
+        Notice.hr_header("Initializing")
         # Could do this dynamically.
         params = kwargs.get('params')
         layers = kwargs.get('layers')
@@ -111,7 +152,7 @@ class TransectContainer(BaseContainer):
 
         self.tops_file = data['tops_file']
         self.log = LogContainer(data['well_dir'], params)
-        self.velocity = velocity_factory(velocity, params)
+        self.velocity = self.__velocity_factory(velocity, params)
         self.seismic = SeismicContainer(data['seismic_dir'],
                                         self.velocity,
                                         params)
@@ -132,7 +173,7 @@ class TransectContainer(BaseContainer):
         self.extents[0] = 0
         self.extents[1] = self.data.length
 
-        print "\n+++++++++++++++++++++++++++++++++\nUPDATING"
+        Notice.hr_header("Updating")
         # update the containers
         self.velocity.update(self.data)
         self.log.update(self.data)
@@ -143,9 +184,23 @@ class TransectContainer(BaseContainer):
         self.potfield.update(self.data)
         self.locmap.update(self.data)
 
-        print "\n+++++++++++++++++++++++++++++++++\nPLOTTING"
+        Notice.hr_header("Plotting")
         plot(self)
         plt.show()
+
+    def __velocity_factory(self, model_params, params):
+        """
+        Factory function for returning a VelocityContainer matching the
+        given params
+        """
+        if model_params["type"] == "constant":
+            return ConstantVelocityContainer(model_params["data"], params)
+        elif model_params["type"] == "segy":
+            return SegyVelocityContainer(model_params["data"], params)
+        elif model_params["type"] == "simple":
+            return SimpleVelocityContainer(model_params["data"], params)
+        else:
+            raise VelocityError("Invalid velocity type")
 
 
 class LocmapContainer(BaseContainer):
@@ -181,7 +236,7 @@ class LocmapContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "\nUpdating", self.__class__.__name__
+        Notice.info("Updating " + self.__class__.__name__)
 
         pad = self.settings['map_padding']
         aspect = 12/3.  # I was expecting it to be 8:3.
@@ -291,7 +346,7 @@ class ElevationContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "\nUpdating", self.__class__.__name__
+        Notice.info("Updating " + self.__class__.__name__)
 
         # space = np.linspace(0, transect.length, self.nsamples)
         for i, n in enumerate(self.linspace):
@@ -331,7 +386,7 @@ class BedrockContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "\nUpdating", self.__class__.__name__
+        Notice.info("Updating " + self.__class__.__name__)
 
         self.reset_data()
 
@@ -380,8 +435,7 @@ class SegyContainer(BaseContainer):
         for f in utils.listdir(segy_dir, '\\..+\\.shp$'):
             with fiona.open(f, "r") as traces:
                 for trace in traces:
-                    self.lookup[shape(trace["geometry"])] = \
-                      trace["properties"]
+                    self.lookup[shape(trace["geometry"])] = trace["properties"]
 
     def update(self, transect, flat=False):
         """
@@ -395,7 +449,7 @@ class SegyContainer(BaseContainer):
             flat (Bool): Reads data into a flat list instead of
                          sorting by files.
         """
-        print "\nUpdating", self.__class__.__name__
+        Notice.info("Updating " + self.__class__.__name__)
 
         self.reset_data()
 
@@ -518,10 +572,9 @@ class HorizonContainer(BaseContainer):
         super(HorizonContainer, self).__init__(params)
 
         self.velocity = velocity
-        
+
         self.data = {}
         self.coords = {}
-
         self.lookup = {}
 
         for fname in utils.listdir(hor_dir):
@@ -533,50 +586,33 @@ class HorizonContainer(BaseContainer):
                 line, cdp, x, y, t, surv = s.split()
                 x, y = int(float(x)), int(float(y))
                 t = float(t)
-                points.append((x,y,t))
-
+                points.append(Point(x, y, t))
             if self.lookup.get(name):
-                # Then it already exists so add to it.
                 self.lookup[name] += points
             else:
-                # Then it's new data so grab what we have.
                 self.lookup[name] = points
 
     def update(self, transect):
-        print "\nUpdating", self.__class__.__name__
+        Notice.info("Updating " + self.__class__.__name__)
 
+        b = self.settings['fine_buffer']
+        prepared = prep(transect.buffer(b))
 
-        # Make the transect into a 3d polygon
-        transect_points = []
-        for point in transect.coords:
-
-            transect_points.append((point[0], point[1], 0))
-            transect_points.append((point[0], point[1], 100000))
-
-        transect_polygon = MultiPoint(transect_points).convex_hull
-        
         for horizon, points in self.lookup.items():
 
+            l = len(points)
+            points = filter(prepared.contains, points)
+            print horizon, len(points), "of", l
 
-            data = []
-            coords = []
-            
-            surface = MultiPoint(points).convex_hull
-           
-            intersect = transect_polygon.intersection(surface)
+            data, coords = [], []
+            for p in points:
+                coords.append(transect.project(p))
+                data.append(p.z)
 
-            # this is the intersection, now just project into
-            # a range coordinate
-            for coord in intersect.exterior.coords:
-                coords.append(transect.project(Point(coord[0:2])))
-                ## TODO Depth conversion for a point
-                #data  = self.velocity(data[2], coords[-1], 1,1]
-                data.append(coord[2]) # depth
-
-            
             self.data[horizon] = np.array(data)
             self.coords[horizon] = np.array(coords)
-            
+
+
 class PotfieldContainer(BaseContainer):
     """
     Contains potential field data.
@@ -626,11 +662,10 @@ class PotfieldContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "\nUpdating", self.__class__.__name__
-
-        print self.data.keys()
+        Notice.info("Updating " + self.__class__.__name__)
 
         for name, payload in self.data.items():
+            print name
             payload['coords'] = self.linspace
             payload['data'] = np.zeros_like(self.linspace)
             if payload['colour_is_file']:
@@ -733,7 +768,7 @@ class LogContainer(BaseContainer):
         Args:
             transect (LineString): A transect line.
         """
-        print "\nUpdating", self.__class__.__name__
+        Notice.info("Updating " + self.__class__.__name__)
 
         # Preprocess
         prepared = prep(transect.buffer(self.settings['buffer']))
@@ -758,6 +793,7 @@ class LogContainer(BaseContainer):
                 self.log_lookup[name] = self.data[-1]
 
             if not self.log_lookup.get(name):
+                print
                 self.data.append(None)
 
             sl_name = getattr(self, 'striplog', None)
@@ -772,9 +808,6 @@ class LogContainer(BaseContainer):
                     # Add it to the well
                     self.log_lookup[name].add_striplog(sl.striplog[sl_name],
                                                        sl_name)
-            if not sl:
-                # Unset this so we can easily test for it later.
-                self.striplog = False
 
             self.coords.append(transect.project(point))
 
@@ -782,7 +815,6 @@ class LogContainer(BaseContainer):
         """
         Returns data corresponding to log_id.
         """
-        print "Looking up", log_id
         return self.log_lookup.get(log_id)
 
     def get_point(self, log_id):
@@ -800,6 +832,7 @@ class LogContainer(BaseContainer):
 class VelocityError(Exception):
     pass
 
+
 class ConstantVelocityContainer(BaseContainer):
     """
     Class for handling constant velocity models
@@ -810,7 +843,7 @@ class ConstantVelocityContainer(BaseContainer):
         super(ConstantVelocityContainer, self).__init__(params)
 
         self.velocity = velocity
-        
+
     def update(self, transect):
         """
         Does nothing, velocity is constant
@@ -820,7 +853,7 @@ class ConstantVelocityContainer(BaseContainer):
     def time2depth(self, data, point, dt, dz):
         """
         Converts a data array from time to depth
-        
+
         Args:
             data (array, 1d): A 1D numpy array.
             point (float):  distance along transect corresponding to
@@ -832,14 +865,13 @@ class ConstantVelocityContainer(BaseContainer):
                         data.
         """
         velocity = self.velocity
-        return time_to_depth(data,np.ones(data.size)*velocity,
-                             dt, dz)
+        return time_to_depth(data, np.ones(data.size)*velocity, dt, dz)
 
     def depth2time(self, data, point, dz, dt):
         """
         Converts a data array the depth domain to the time
         domain.
-        
+
         Args:
             data (array, 1d): A 1D numpy array.
             point (float):  distance along transect corresponding to
@@ -852,8 +884,8 @@ class ConstantVelocityContainer(BaseContainer):
         """
 
         velocity = self.velocity
-        return depth_to_time(data, np.ones(data.size)*velocity,
-                             dz, dt)
+        return depth_to_time(data, np.ones(data.size)*velocity, dz, dt)
+
 
 class SimpleVelocityContainer(BaseContainer):
     """
@@ -861,7 +893,6 @@ class SimpleVelocityContainer(BaseContainer):
     files. Simple example below, # are not parsed and are used as
     comments.
 
-    
     coordinates, 150,20.25
 
     # time [s], depth [m]
@@ -874,7 +905,7 @@ class SimpleVelocityContainer(BaseContainer):
     def __init__(self, vel_dir, params):
 
         # Initialize the base class
-        super(SimpleVelocityContainer,self).__init__(params)
+        super(SimpleVelocityContainer, self).__init__(params)
 
         self.profiles = {}
         for profile in fnmatch.filter(os.listdir(vel_dir), '*.vel'):
@@ -885,21 +916,20 @@ class SimpleVelocityContainer(BaseContainer):
                 header = False
                 loc = None
                 while not header:
-                    
+
                     l = f.readline().lstrip()
                     if l.startswith('#'):
                         pass
                     elif l.startswith('coordinates'):
-                      
-                        x,y = l.split(',')[1:]
+
+                        x, y = l.split(',')[1:]
                         x = float(x)
                         y = float(y)
 
-                        loc = Point((x,y))
+                        loc = Point((x, y))
                         header = True
 
-
-                # build up the time depth profile
+                # Build up the time depth profile
                 self.profiles[loc] = []
                 for line in f.readlines():
 
@@ -910,12 +940,9 @@ class SimpleVelocityContainer(BaseContainer):
                     if(len(line.strip().split(',')) == 2):
                         time, depth = line.strip().split(',')
 
-                        self.profiles[loc].append([float(time),
-                                              float(depth)])
+                        self.profiles[loc].append([float(time), float(depth)])
 
-    
     def update(self, transect):
-
         self.data = []
         self.coords = []
 
@@ -937,8 +964,8 @@ class SimpleVelocityContainer(BaseContainer):
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
 
-        time = self.data[closest][:,0]
-        depth = self.data[closest][:,1]
+        time = self.data[closest][:, 0]
+        depth = self.data[closest][:, 1]
 
         time[0] = time[1]
         vavg = depth / time
@@ -956,15 +983,15 @@ class SimpleVelocityContainer(BaseContainer):
         return np.interp(z_out, z_in, data, data[0], data[1])
 
     def depth2time(self, data, point, dz, dt):
-        
+
         # Find the nearest profile
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
 
-        time = self.data[closest][:,0]
-        depth = self.data[closest][:,0]
+        time = self.data[closest][:, 0]
+        depth = self.data[closest][:, 0]
 
-        time[0] = time[1] # divide by zero hack
+        time[0] = time[1]  # divide by zero hack
         vavg = depth / time
 
         # resample vavg to match the data
@@ -978,8 +1005,8 @@ class SimpleVelocityContainer(BaseContainer):
 
         # do the conversion
         return np.interp(t_out, t_in, data, data[0], data[1])
-                    
-                    
+
+
 class SegyVelocityContainer(SegyContainer):
     """
     Container for managing velocity profiles.
@@ -1002,10 +1029,10 @@ class SegyVelocityContainer(SegyContainer):
         seismic = np.array(trace)
 
         # HACK TO MAKE FAKE VELOCITIES
-        velocity = np.ones(profile.data.size) *2000.0
+        velocity = np.ones(profile.data.size) * 2000.0
 
         print idx+1, 'of', len(self.coords)
-        
+
         samp = profile.stats["sampling_rate"]
         vel_z = np.arange(velocity.size) * 1.0 / samp
 
@@ -1021,8 +1048,6 @@ class SegyVelocityContainer(SegyContainer):
 
         return data
 
-
-        
     def time2depth(self, trace, point, dt, dz):
         """
         Converts a seismic trace from time to depth.
@@ -1039,7 +1064,7 @@ class SegyVelocityContainer(SegyContainer):
         seismic = np.array(trace)
 
         # HACK TO MAKE FAKE VELOCITIES
-        velocity = np.ones(profile.data.size) *2000.0
+        velocity = np.ones(profile.data.size) * 2000.0
 
         print idx+1, 'of', len(self.coords)
         samp = profile.stats["sampling_rate"]
@@ -1056,29 +1081,3 @@ class SegyVelocityContainer(SegyContainer):
                              mode="cubic")
 
         return data
-
-
-def velocity_factory(model_params, params):
-    """
-    Factory function for returning a VelocityContainer matching the
-    given params
-    """
-
- 
-    if model_params["type"] == "constant":
-
-        return ConstantVelocityContainer(model_params["data"],
-                                         params)
-
-    elif model_params["type"] == "segy":
-
-        return SegyVelocityContainer(model_params["data"],
-                                     params)
-
-    elif model_params["type"] == "simple":
-
-        return SimpleVelocityContainer(model_params["data"],
-                                       params)
-    else: raise VelocityError("Invalid velocity type")
-
-                
