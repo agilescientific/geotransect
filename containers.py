@@ -9,6 +9,7 @@ Defines various data containers for plotting a transect.
 import os
 import fnmatch
 from functools import partial
+import time
 
 # Import required to avoid bug in Basemap
 from mpl_toolkits.basemap import Basemap
@@ -33,49 +34,12 @@ from striplog import Well, Lexicon
 
 from plot import plot
 from sgy2shp import sgy2shp, ShapeFileExists
+from notice import Notice
 import utils
 
 
 class ContainerError(Exception):
     pass
-
-
-class Notice(object):
-    """
-    Helper class to make printout more readable.
-    """
-    styles = {'HEADER': '\033[95m',
-              'INFO': '\033[94m',      # blue
-              'OK': '\033[92m',        # green
-              'WARNING': '\033[93m',   # red
-              'FAIL': '\033[91m',
-              'BOLD': '\033[1m'
-              }
-    ENDC = '\033[0m'
-
-    def __init__(self, string, style):
-        print self.styles[style] + string + self.ENDC
-
-    @classmethod
-    def warning(cls, string):
-        return cls(string, 'WARNING')
-
-    @classmethod
-    def header(cls, string):
-        return cls('\n'+string+'\n', 'HEADER')
-
-    @classmethod
-    def hr_header(cls, string):
-        hr = "\n+++++++++++++++++++++++++++++++++\n"
-        return cls(hr+string.upper(), 'HEADER')
-
-    @classmethod
-    def info(cls, string):
-        return cls('\n'+string, 'INFO')
-
-    @classmethod
-    def ok(cls, string):
-        return cls(string, 'OK')
 
 
 class BaseContainer(object):
@@ -119,9 +83,9 @@ class TransectContainer(BaseContainer):
     """
     def __init__(self, **kwargs):
 
-        Notice.header("Welcome to geotransect!")
+        Notice.title()
         Notice.hr_header("Initializing")
-        # Could do this dynamically.
+
         params = kwargs.get('params')
         layers = kwargs.get('layers')
         potfields = kwargs.get('potfields')
@@ -130,7 +94,9 @@ class TransectContainer(BaseContainer):
 
         super(TransectContainer, self).__init__(params)
 
-        print "Starting {0}, id {1}".format(self.title, self.id)
+        print "Starting {}, id {}, file {}".format(self.title,
+                                                   self.id,
+                                                   self.config_file)
 
         # Set up 'data' — the transect line — from shapefile.
         self.data = None
@@ -144,12 +110,12 @@ class TransectContainer(BaseContainer):
         # self.data.length holds the length of the transect in metres
         # But often we want ints, and sometimes the number of samples.
         # This will give us a nice linspace. Put them in params.
-        # TODO: Allow decimation?
         params['length'] = self.length = int(np.floor(self.data.length))
         params['nsamples'] = self.nsamples = self.length + 1
         params['linspace'] = self.linspace = np.linspace(0, self.length,
                                                          self.nsamples)
 
+        self.time = time.strftime("%Y/%m/%d %H:%M", time.localtime())
         self.tops_file = data['tops_file']
         self.log = LogContainer(data['well_dir'], params)
         self.velocity = self.__velocity_factory(velocity, params)
@@ -527,24 +493,52 @@ class SeismicContainer(SegyContainer):
         # Do the super class
         super(SeismicContainer, self).update(transect)
 
-        # Set in cfg: self.dz = 25.0
-
         data = []
         # Loop through files
         for segydata, coords in zip(self.data, self.coords):
             # Through traces
             traces = []
             for trace, coord in zip(segydata, coords):
+                print '.',
+
                 samp = trace.stats["sampling_rate"]
 
+                # The newt is the new trace.
+                # We'll make it over the requested extents, with
+                # a sample interval of 1. 's' is in m or ms.
                 if self.domain.lower() in ['depth', 'd', 'z']:
-                    traces.append(self.velocity.time2depth(trace.data,
-                                                           coord,
-                                                           1.0/samp,
-                                                           self.dz))
+                    # Can't use 'extents' because we don't know yet
+                    # How much seismic there is or what the velocities
+                    # are like. Might need much deeper data.
+                    s = np.arange(0, 20000)  # Just make a large container
                 else:
-                    # Domain is time
-                    traces.append(trace.data)
+                    s = np.arange(self.range[0], self.range[1]+1)
+                newt = np.zeros_like(s)
+                # newt[:] = np.nan < this doesn't display properly
+
+                # Make a 'fake' constant velocity for resampling.
+                p = {'range': (self.range[0], self.range[1])}
+                resampler = ConstantVelocityContainer(2000, params=p)
+                this_dt = 1./samp
+
+                # This is not really a time2depth conversion. We are just
+                # resampling to 1 ms.
+                upsampled = resampler.time2depth(trace.data, coord, this_dt, 1.)
+                this_trace_l = np.size(upsampled)
+                if this_trace_l > newt.size:
+                    newt = upsampled[:newt.size]
+                else:
+                    newt[:this_trace_l] = upsampled
+
+                if self.domain.lower() in ['depth', 'd', 'z']:
+                    traces.append(self.velocity.time2depth(newt,
+                                                           coord,
+                                                           s/1000,
+                                                           s))
+
+                else:
+                    traces.append(newt)
+
             data.append(np.transpose(np.array(traces)))
 
         self.data = data
@@ -869,15 +863,15 @@ class ConstantVelocityContainer(BaseContainer):
 
     def depth2time(self, data, point, dz, dt):
         """
-        Converts a data array the depth domain to the time
+        Converts a data array in the depth domain to the time
         domain.
 
         Args:
             data (array, 1d): A 1D numpy array.
             point (float):  distance along transect corresponding to
-            the trace location. Not actually used, as this model
-            assumes a constant velocity
-
+                the trace location. Not actually used, as this model
+                assumes a constant velocity. Kept for consistency with other
+                velocity methods.
             dz (float): The sample interval of the input data.
             dt (float): The sample interval of the converted
                         data.
@@ -1038,13 +1032,11 @@ class SegyVelocityContainer(SegyContainer):
 
         z = np.arange(seismic.size)*dz
 
-        velocity = np.interp(z, vel_z, velocity, velocity[0],
-                             velocity[-1])
+        velocity = np.interp(z, vel_z, velocity, velocity[0], velocity[-1])
 
         t = np.arange(self.range[0], self.range[1], dt)
 
-        data = time_to_depth(seismic, velocity, z, t,
-                             mode="cubic")
+        data = time_to_depth(seismic, velocity, z, t, mode="cubic")
 
         return data
 
@@ -1055,7 +1047,7 @@ class SegyVelocityContainer(SegyContainer):
         Args:
             trace (array, 1d): A 1D numpy array.
             point (float):  distance along transect corresponding to
-            the trace location.
+                the trace location.
         """
         distance = [(p - point)**2.0 for p in self.coords]
         idx = np.argmin(distance)
@@ -1072,12 +1064,10 @@ class SegyVelocityContainer(SegyContainer):
 
         t = np.arange(seismic.size)*dt
 
-        velocity = np.interp(t, vel_t, velocity, velocity[0],
-                             velocity[-1])
+        velocity = np.interp(t, vel_t, velocity, velocity[0], velocity[-1])
 
         z = np.arange(self.range[0], self.range[1], dz)
 
-        data = time_to_depth(seismic, velocity, t, z,
-                             mode="cubic")
+        data = time_to_depth(seismic, velocity, t, z, mode="cubic")
 
         return data

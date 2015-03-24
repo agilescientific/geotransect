@@ -9,11 +9,11 @@ params:
     subtitle: Windsor Basin
     id: 1
     description: Transect used for testing geotransect.
-    domain: depth
+    domain: time
     range:
         - 0
-        - 3000
-    dz: 4  # Needed for depth conversion
+        - 4000
+    #dz: 4  # Needed for depth conversion
     data_dir: /Users/matt/Dropbox/geotransect_test/data
     seismic_cmap: Greys  # http://ageo.co/modelrcolour
     seismic_log: GR
@@ -34,7 +34,7 @@ data:
     elevation_file: elevation/NS_DEM_ascii.asc
     bedrock_dir: bedrock
     basins_dir: basins  # Not currently used
-    tops_file: wells/P-129_tops.txt  # Need to make this dynamic, or just handle in well
+    tops_file: wells/data/P-129_tops.txt  # Need to make this dynamic, or just handle in well
 
 velocity:
     type: constant # (segy (dir), constant (float), simple(dir))

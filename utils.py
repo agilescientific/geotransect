@@ -94,3 +94,18 @@ def utm2lola(data):
         utm2lola = partial(pp.transform, utm_nad83, ll_nad83)
 
         return transform(utm2lola, data)
+
+
+def get_tops(fname):
+    """
+    Takes a tops_dictionary for plotting in the logs tracks.
+    Args:
+    fname (str): The path to a file containing the tops.
+    """
+    tops = {}
+    with open(fname) as f:
+        for line in f.readlines():
+            if not line.startswith('#'):
+                temp = line.strip().split(',')
+                tops[temp[0]] = float(temp[1])
+    return tops

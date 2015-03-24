@@ -7,6 +7,7 @@ Functions for plotting.
 :license: Apache 2.0
 """
 import os
+import datetime
 
 from PIL import Image
 import numpy as np
@@ -15,7 +16,6 @@ from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
 from matplotlib import gridspec
-from shapely.ops import transform
 from matplotlib.ticker import ScalarFormatter
 
 from autowrap import on_draw
@@ -88,7 +88,7 @@ def plot(tc):
     header.axhline(y=0.5,
                    xmin=0,
                    xmax=1.25,
-                   linewidth=2,
+                   linewidth=1.5,
                    color='k')
 
     # Meta description
@@ -96,7 +96,7 @@ def plot(tc):
                 (tc.subtitle),
                 fontsize=14,
                 horizontalalignment='right',
-                verticalalignment='bottom')
+                verticalalignment='bottom', weight='bold')
 
     # Wrap text
     fig.canvas.mpl_connect('draw_event', lambda event: on_draw(event))
@@ -128,7 +128,7 @@ def plot(tc):
                 ax=locmap)
 
     # Finish drawing the basemap.
-    draw_basemap(m)
+    draw_basemap(m, tc)
 
     for layer, details in tc.locmap.layers.items():
         data = getattr(tc.locmap, layer)
@@ -164,6 +164,10 @@ def plot(tc):
     line_t = utils.utm2lola(tc.data)
     plot_line(m, line_t, colour='r', lw=3)
 
+    # Adjust border thickness
+    [i.set_linewidth(8) for i in locmap.spines.itervalues()]
+    [i.set_color("white") for i in locmap.spines.itervalues()]
+
     # Elevation and bedrock plot
     # -----------------------------------------------------------#
     print "Elevation"
@@ -185,6 +189,10 @@ def plot(tc):
                       linewidth=0,
                       color=color.flatten())
 
+        elevation.plot(tc.elevation.coords[idx],
+                      tc.elevation.data[idx],
+                      lw=0.5, color='k')
+
     max_height = np.amax(tc.elevation.all_data)
 
     elevation.set_ylim((0, max_height))
@@ -198,14 +206,14 @@ def plot(tc):
     elevation.grid(True)
     elevation.tick_params(axis='x', which='major', labelsize=0)
     elevation.xaxis.grid(True, which='major')
-    elevation.text(500, 0.8*max_height,
+    elevation.text(0.01, 0.8,
                    "Elevation",
                    props, va='bottom',
-                   fontsize=10)
-    elevation.text(500, 0.75*max_height,
+                   fontsize=10, transform=elevation.transAxes)
+    elevation.text(0.01, 0.75,
                    "Surface geology",
                    props, va='top',
-                   fontsize=10)
+                   fontsize=10, transform=elevation.transAxes)
     elevation.set_frame_on(False)
     for tick in elevation.get_xaxis().get_major_ticks():
         tick.set_pad(-8.)
@@ -224,23 +232,35 @@ def plot(tc):
     # Horizons
     colours = ['b', 'g', 'orange', 'c', 'magenta', 'pink']
     for i, (horizon, data) in enumerate(tc.horizons.data.items()):
+
+        # If we're in depth, we need to depth-convert the horizons.
+        if tc.domain.lower() in ['depth', 'd', 'z']:
+            print "Time-converting horizon", horizon
+            # TODO: PROPER DEPTH-CONVERTER CODE HERE
+            # This will only work for constant velocities
+            data = (data/2000.) * tc.horizons.velocity.velocity
+        else:
+            # Seismic is in time, leave the horizons alone.
+            pass
+
         coords = tc.horizons.coords[horizon]
         xsection.scatter(coords/1000, data,
                          color=colours[i],
                          marker='.')
 
         # labels
-        xsection.text(0.025, 0.025*(i+1),
+        xsection.text(0.01, 0.025*(i+1),
                       horizon,
                       transform=xsection.transAxes,
                       ha='left', color=colours[i],
                       va='center', fontsize=12)
 
+    # Axes etc.
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
     xsection.set_xticklabels([])
-    if tc.domain.lower() in ['depth', 'd']:
+    if tc.domain.lower() in ['depth', 'd', 'z']:
         xsection.set_ylabel("Depth [m]", fontsize=8)
     else:
         xsection.set_ylabel("TWTT [ms]", fontsize=8)
@@ -248,20 +268,19 @@ def plot(tc):
     xsection.tick_params(axis='x', which='major', labelsize=0)
     xsection.yaxis.grid(True, which='major')
     xsection.xaxis.grid(True, which='major')
-    #xsection.grid(True)
     xsection.set_frame_on(False)
 
     # Seismic colorbar
     # extreme = max(np.amax(data), abs(np.amin(data)))
     colorbar_ax = add_subplot_axes(xsection, [0.975, 0.025, 0.01, 0.1])
     fig.colorbar(im, cax=colorbar_ax)
-    colorbar_ax.text(0.5, 0.9, "+", weight='bold',
+    colorbar_ax.text(0.5, 0.9, "+",
                      transform=colorbar_ax.transAxes,
                      ha='center', color='white',
                      va='center', fontsize=12)
-    colorbar_ax.text(0.5, 0.1, "-", weight='bold',
+    colorbar_ax.text(0.5, 0.15, "-",
                      transform=colorbar_ax.transAxes, color='k',
-                     ha='center', va='center', fontsize=12)
+                     ha='center', va='center', fontsize=16)
     colorbar_ax.set_axis_off()
 
     # Potential field data
@@ -289,25 +308,18 @@ def plot(tc):
         scale = payload['scale']
         if scale:
             this_ax.set_ylim(float(scale[1]), float(scale[0]))
-        ymax = this_ax.get_ylim()[1]
-        this_ax.text(500, ymax, field,
+        #ymax = this_ax.get_ylim()[1]
+        this_ax.text(0.01, 1.0, field,
                      va='top',
                      fontsize=10,
-                     color='k')
+                     color='k', transform=this_ax.transAxes)
 
     potfield.axis(plot_axis)
-    #potfield.set_xlim([tc.extents[0] / 1000., tc.extents[1] / 1000.])
-
-    # Would be nice but doesn't seem to honour power limits.
-    #fmt = ScalarFormatter()
-    #fmt.set_powerlimits((-3, 3))
-    #potfield.xaxis.set_major_formatter(fmt)
-
     potfield.set_frame_on(False)
     potfield.set_yticks([])
     potfield.xaxis.grid(True, which='major')
     potfield.tick_params(axis='x', which='major', labelsize=10)
-    potfield.set_xlabel("Transect range [km]", fontsize=10)
+    potfield.set_xlabel("Transect range [km]", fontsize=10, ha='center')
 
     # Log overlays
     # --------------------------------------------------------#
@@ -333,10 +345,19 @@ def plot(tc):
         if las:
             data = np.nan_to_num(las.data[tc.seismic_log])
             data /= np.amax(data)
+            z = las.data['DEPT']
+
+            if tc.domain.lower() in ['time', 'twt', 'twtt', 't']:
+                print "Time-converting section well", name
+                dt = 0.001
+                data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
+                z = np.arange(0, len(data), 1)
+
+            # Some post-processing for display
             lgsc = 0.015  # hack to compress the log width
             data *= lgsc * (tc.extents[1] - tc.extents[0])
             data += pos - 0.5 * np.amax(data)
-            z = las.data['DEPT']
+
             xsec_logs.axvline(x=pos,
                               color=well_colour,
                               alpha=alpha,
@@ -365,11 +386,11 @@ def plot(tc):
                        weight=weight)
 
     # Log type annotation, top left
-    xsec_logs.text(500, 20,
+    xsec_logs.text(0.01, 0.99,
                    tc.seismic_log+' log',
                    color=c,
                    va='top',
-                   fontsize=12)
+                   fontsize=12, transform=xsec_logs.transAxes)
 
     #  Feature plot
     # -----------------------------------------------------#
@@ -382,11 +403,19 @@ def plot(tc):
                         fontsize=14,
                         fontweight='bold'
                         )
+
+        # horizontal line
+        log_header.axhline(y=0.5,
+                           xmin=0,
+                           xmax=1.25,
+                           linewidth=1,
+                           color='k')
+
         log_header.axis("off")
 
         plot_feature_well(tc, gs)
 
-    # Logo
+    # Logo etc.
     # --------------------------------------------------------------#
     print "Logo"
     # path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
@@ -401,25 +430,41 @@ def plot(tc):
     # logo.imshow(im)
     # logo.axis("off")
 
-    # try:
-    #     path = os.path.join(tc.data_dir, tc.settings['logo_file'])
-    #     print path
-    #     im = Image.open(path)
-    #     im = im.thumbnail((100, 100), Image.ANTIALIAS)
-    #     w, h = im.size
-    # except IOError:
-    #     print "Image is missing", path
+    try:
+        path = os.path.join(tc.data_dir, tc.settings['logo_file'])
+        im = Image.open(path)
+        im.thumbnail((90, 90), Image.ANTIALIAS)
+    except IOError:
+        print "Image is missing", path
+        im = np.zeros((1,1,3))
 
-    # # We need a float array between 0-1, rather than
-    # # a uint8 array between 0-255
-    # im = np.array(im).astype(np.float) / 255
+    w, h = im.size
 
-    # # With newer (1.0) versions of matplotlib, you can
-    # # use the "zorder" kwarg to make the image overlay
-    # # the plot, rather than hide behind it... (e.g. zorder=10)
-    # fig.figimage(im, fig.bbox.xmax - w, fig.bbox.ymax - h)
+    # We need a float array between 0-1, rather than
+    # a uint8 array between 0-255
+    im = np.array(im).astype(np.float) / 255
+
+    # With newer (1.0) versions of matplotlib, you can
+    # use the "zorder" kwarg to make the image overlay
+    # the plot, rather than hide behind it... (e.g. zorder=10)
+    fig.figimage(im, (0.95*fig.bbox.xmax) - w, (0.96*fig.bbox.ymax) - h)
+
+    # Annotate config file and creation date
+    plt.figtext(0.950, 0.030, tc.time,
+                ha="right", va="bottom", color="gray", size=8)
+    plt.figtext(0.950, 0.04, tc.config_file,
+                ha="right", va="bottom", color="gray", size=8)
+
+    year = datetime.datetime.now().year
+    text = "$\copyright$ {} Department of Energy".format(year)
+    plt.figtext(0.750, 0.03, text,
+                ha="left", va="bottom", color="gray", size=8)
 
     # Finish
     # --------------------------------------------------------------#
-    plt.show()
-    #plt.savefig("test.png")
+    save_file = getattr(tc, 'save_file', None)
+    if save_file:
+        print "Saving file", save_file
+        plt.savefig(save_file)
+    else:
+        plt.show()

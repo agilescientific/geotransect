@@ -126,6 +126,7 @@ def main(ymlfile):
         cfg = yaml.load(f, Loader)
 
     kwargs = {}
+    cfg['params']['config_file'] = ymlfile.name
     kwargs['params'] = cfg['params']
     root = cfg['params']['data_dir']
     kwargs['data'] = complete_paths(cfg['data'], root)

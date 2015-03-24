@@ -66,7 +66,7 @@ def plot_point(m, point, colour='b', shape='o', alpha=1, zorder=None):
                      zorder=zorder)
 
 
-def draw_basemap(m):
+def draw_basemap(m, tc):
     """
     Puts some standard bits of decoration on a matplotlib Basemap.
 
@@ -76,12 +76,24 @@ def draw_basemap(m):
     Returns:
         m (Basemap): The newly decorated Basemap.
     """
+    m.drawmapboundary(fill_color='#ccddee')
     m.drawcoastlines(color='#9caf9c')
     m.drawcountries()
-    m.fillcontinents(color='#d8e3d8')
-    m.drawmapboundary(color='gray')
-    m.drawmeridians(np.arange(0, 360, 1), color='gray')
-    m.drawparallels(np.arange(-90, 90, 1), color='gray')
+    m.fillcontinents(color='#d8e3d8', lake_color='#ccddee')
+    m.drawmeridians(np.arange(0, 360, 0.5),
+                    color='gray',
+                    labels=[False, False, True, False])
+    m.drawparallels(np.arange(-90, 90, 0.5),
+                    color='gray',
+                    labels=[True, False, False, False])
+    m.drawmapscale(tc.locmap.ll.x + 0.2, tc.locmap.ll.y + 0.075,
+                   tc.locmap.ll.x, tc.locmap.ll.y,
+                   20.,
+                   barstyle='fancy', labelstyle='simple',
+                   fillcolor1='w', fillcolor2='#555555',
+                   fontcolor='#555555',
+                   zorder=5)
+
     return m
 
 

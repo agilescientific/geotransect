@@ -66,6 +66,7 @@ def plot_feature_well(tc, gs):
     logs = tc.log.get(tc.feature_well)
 
     Z = logs.data['DEPT']
+
     curves = ['GR', 'DT',
               'DPHI_SAN',
               'NPHI_SAN',
@@ -75,13 +76,13 @@ def plot_feature_well(tc, gs):
               'DRHO']
 
     window = 51    # window length for smoothing must be an odd integer
-    ntracks = 5.
+    ntracks = 5
     lw = 1.0
     smooth = True
     naxes = 0
     ncurv_per_track = np.zeros(ntracks)
 
-    if getattr(tc, 'striplog', None):
+    if getattr(tc.log, 'striplog', None):
         ncurv_per_track[0] = 1
 
     for curve in curves:
@@ -103,7 +104,7 @@ def plot_feature_well(tc, gs):
 
     axs = [axs0, axs1, axs2, axs3, axs4]
 
-    if getattr(tc, 'striplog', None):
+    if getattr(tc.log, 'striplog', None):
         legend = Legend.default()
         logs.striplog[tc.log.striplog].plot_axis(axs0[0], legend=legend)
 
@@ -153,7 +154,12 @@ def plot_feature_well(tc, gs):
 
         if (curve == 'DPHI_SAN') and params['fill_left_cond']:
             # do the fill for the neutron porosity track
-            nphi = utils.rolling_median(logs.data['NPHI_SAN'], window)
+            try:
+                nphi = utils.rolling_median(logs.data['NPHI_SAN'], window)
+            except ValueError:
+                print "No NPHI in this well"
+                nphi = np.empty_like(Z)
+                nphi[:] = np.nan
             axs[i][j].fill_betweenx(Z,
                                     nphi,
                                     values,
@@ -248,9 +254,10 @@ def plot_feature_well(tc, gs):
     # ------------------------------------------------- #
 
     # Add Depth label
-    axs[0][0].text(-0.25, 50, 'MD \n $m$ ', fontsize='10',
-                   horizontalalignment='left',
-                   verticalalignment='center')
+    axs[0][0].text(0, 1.05, 'MD m', fontsize='10',
+                   horizontalalignment='center',
+                   verticalalignment='center',
+                   transform=axs[0][0].transAxes)
 
     axs[0][0].axes.yaxis.get_ticklabels()
     axs[0][0].axes.xaxis.set_ticklabels('')
@@ -264,9 +271,8 @@ def plot_feature_well(tc, gs):
         label.set_fontsize(10)
 
     try:
-        tops_fname = os.path.join(tc.data_dir, tc.tops_file)
-        if os.path.exists(tops_fname):
-            tops = utils.get_tops(tops_fname)
+        if os.path.exists(tc.tops_file):
+            tops = utils.get_tops(tc.tops_file)
             topx = get_curve_params('DT', fname)
             topmidpt = np.amax((topx)['xright'])
 
