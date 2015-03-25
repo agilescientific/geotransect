@@ -3,8 +3,11 @@
 """
 Master script to build transects.
 
-Put configuration in config.yaml or pass the config file on
-the command line.
+Put configuration in a config file. See config.yaml for a template.
+
+Call this script like so:
+
+    python transect.py -c myconf.yaml
 
 :copyright: 2015 Agile Geoscience
 :license: Apache 2.0
@@ -39,11 +42,34 @@ class Loader(yaml.Loader):
                              Loader.mapping)
 
     def include(self, node):
+        """
+        This allows us to include another settings file.
+
+        Args:
+            node (node): From a pyYAML constructor.
+
+        Returns:
+            Loader: A loaded YAML file.
+
+        Example:
+            self.add_constructor('!include', Loader.include)
+        """
         filename = os.path.join(self._root, self.construct_scalar(node))
         with open(filename, 'r') as f:
             return yaml.load(f, Loader)
 
     def mapping(self, node):
+        """
+        Allows us to construct a mapping with an OrderedDict, rather than
+        the usual dict. This means we can preserve the order in which things
+        were specified in the YAML file.
+
+        Args:
+            node (node): From a pyYAML constructor.
+
+        Returns:
+            OrderedDict: The dict we always wanted.
+        """
         self.flatten_mapping(node)
         return OrderedDict(self.construct_pairs(node))
 
@@ -56,10 +82,15 @@ def complete_paths(dictionary, root):
     Args:
         dictionary (dict): A dict of relative file names or directories.
         root (str): The absolute path to the relative paths in `dictionary`.
+
+    Returns:
+        dict: The completed dictionary.
     """
     for k, v in dictionary.items():
         # This feels unpythonic, but it's the best I can come up with.
         # See discussion http://stackoverflow.com/questions/9168904/
+        if not v:
+            continue
         if isinstance(v, basestring):
             dictionary[k] = os.path.join(root, v)
         else:
@@ -71,10 +102,19 @@ def complete_paths(dictionary, root):
 
 
 def complete_vel_paths(dictionary, root):
+    """
+    The velocity dictionary is complicated because we don't want
+    to prepend the data path to a constant velocity.
 
+    Args:
+        dictionary (dict): A dict of relative file names or directories.
+        root (str): The absolute path to the relative paths in `dictionary`.
+
+    Returns:
+        dict: The completed dictionary.
+    """
     if dictionary["type"] != 'constant':
         dictionary["data"] = os.path.join(root, dictionary["data"])
-
     return dictionary
 
 
@@ -85,6 +125,9 @@ def complete_map_paths(dictionary, root):
     Args:
         dictionary (dict): A dict of relative file names or directories.
         root (str): The absolute path to the relative paths in `dictionary`.
+
+    Returns:
+        dict: The completed dictionary.
     """
     for k, v in dictionary.items():
         dictionary[k]['file'] = os.path.join(root, v['file'])
@@ -98,6 +141,9 @@ def complete_pot_paths(dictionary, root):
     Args:
         dictionary (dict): A dict of relative file names or directories.
         root (str): The absolute path to the relative paths in `dictionary`.
+
+    Returns:
+        dict: The completed dictionary.
     """
     for k, v in dictionary.items():
         dictionary[k]['file'] = os.path.join(root, v['file'])
@@ -116,7 +162,7 @@ def main(ymlfile):
     Load a config file, instantiate a TransectContainer, and plot it.
 
     Note:
-        Does not return; the plot is a side-effect.
+        Does not return anything; the plot is a side-effect.
 
     Args:
         ymlfile (file): A configuration file in YAML format.
@@ -126,6 +172,7 @@ def main(ymlfile):
         cfg = yaml.load(f, Loader)
 
     kwargs = {}
+    cfg['params']['config_file'] = ymlfile.name
     kwargs['params'] = cfg['params']
     root = cfg['params']['data_dir']
     kwargs['data'] = complete_paths(cfg['data'], root)
@@ -139,6 +186,10 @@ def main(ymlfile):
 
 
 if __name__ == "__main__":
+    """
+    When called from the command line (probably always), we'll parse the
+    arguments for the config file.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config",
                         metavar="file",

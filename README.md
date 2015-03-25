@@ -1,6 +1,8 @@
 # geotransect
 Tool for visualizing subsurface data along 2D transects.
 
+[![Codacy Badge](https://www.codacy.com/project/badge/93547dee9364471aaacf5461b0b9ab0e)](https://www.codacy.com/app/matt/geotransect)
+
 ## Dependencies
 Some of these dependencies have dependencies of their own, some of which are substantial and need compiling. If you're on a Mac, I recommend using Homebrew for the tricky things like gdal and PROJ4.
 

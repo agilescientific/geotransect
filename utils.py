@@ -17,9 +17,11 @@ from shapely.ops import transform
 def nearest_point(p, plist):
     """
     Given a shapely Point, finds the nearest Point in a list of Points.
+
     Args:
         p (Point): A ``shapely`` Point.
         plist (list): A list of Points.
+
     Returns:
         Point: The nearest Point.
     """
@@ -33,8 +35,10 @@ def listdir(directory, match=None):
     """
     Wrapper for `os.listdir()` that returns full paths. A bit like
     `utils.walk()` but not recursive. Case insensitive.
+
     Args:
         directory (str): The directory to list.
+
     Yields:
         str: Full path to each file in turn.
     """
@@ -49,8 +53,10 @@ def walk(directory, match=None):
     """
     Find files whose names match some regex. Like `fnmatch` but with regex.
     Like `utils.listdir()` but recursive. Case insensitive.
+
     Args:
         directory (str): The directory to start at.
+
     Yields:
         str: Full path to each file in turn.
     """
@@ -89,8 +95,27 @@ def despike(curve, curve_sm, max_clip):
 
 
 def utm2lola(data):
-        utm_nad83 = pp.Proj("+init=EPSG:26920")
-        ll_nad83 = pp.Proj("+proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs")
-        utm2lola = partial(pp.transform, utm_nad83, ll_nad83)
+    """
+    Transform UTMs to lon-lats. Assumes both are NAD83.
+    """
+    utm_nad83 = pp.Proj("+init=EPSG:26920")
+    ll_nad83 = pp.Proj("+proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs")
+    utm2lola = partial(pp.transform, utm_nad83, ll_nad83)
 
-        return transform(utm2lola, data)
+    return transform(utm2lola, data)
+
+
+def get_tops(fname):
+    """
+    Takes a tops_dictionary for plotting in the logs tracks.
+
+    Args:
+        fname (str): The path to a file containing the tops.
+    """
+    tops = {}
+    with open(fname) as f:
+        for line in f.readlines():
+            if not line.startswith('#'):
+                temp = line.strip().split(',')
+                tops[temp[0]] = float(temp[1])
+    return tops

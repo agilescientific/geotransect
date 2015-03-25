@@ -20,6 +20,7 @@ def on_draw(event, axis=None):
     import matplotlib as mpl
     fig = event.canvas.figure
 
+    # Trying to work on only a single axis, but it didn't work out...
     if axis:
         axes = [axis]
     else:

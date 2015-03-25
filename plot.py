@@ -7,6 +7,7 @@ Functions for plotting.
 :license: Apache 2.0
 """
 import os
+import datetime
 
 from PIL import Image
 import numpy as np
@@ -15,13 +16,12 @@ from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
 from matplotlib import gridspec
-from shapely.ops import transform
-from matplotlib.ticker import ScalarFormatter
 
 from autowrap import on_draw
 import utils
 from feature_plot import plot_feature_well
 from plot_utils import *
+from notice import Notice
 
 
 def plot(tc):
@@ -36,10 +36,15 @@ def plot(tc):
     fw = 5   # width of the feature plot (inches) must be div by 5
     n_grids = len(tc.potfield.data)
 
+    # We will save the same figure we make, to ensure the saved figure
+    # has everything in the right places. For example, see this discussion:
+    # http://stackoverflow.com/questions/7906365/
+    save_dpi = getattr(tc, 'save_dpi', tc.settings.get('default_dpi'))
+    dpi = save_dpi or 80
     fig = plt.figure(figsize=(mw + fw + 1, 15),
                      facecolor='w',
                      edgecolor='k',
-                     dpi=None,
+                     dpi=dpi,
                      frameon=True)
 
     gs = gridspec.GridSpec(h, mw + fw + 1)
@@ -56,9 +61,8 @@ def plot(tc):
     # Right-hand column.
     log_header = fig.add_subplot(gs[0:1, -1*fw:])
     # log_plot is dealt with by passing gs to feature_plot.plot_feature_well()
-    #logo = fig.add_subplot(gs[-1:, -1*fw:])
 
-    # Adjust white space between subplots (maybe put in function?)
+    # Adjust white space between subplots
     # ------------------------------------------------------------ #
     left = 0.05     # left side of the subplots of the figure
     right = 0.95    # right side of the subplots of the figure
@@ -88,29 +92,48 @@ def plot(tc):
     header.axhline(y=0.5,
                    xmin=0,
                    xmax=1.25,
-                   linewidth=2,
+                   linewidth=1.5,
                    color='k')
 
-    # Meta description
+    # Subtitle
     header.text(1.0, 0.5 + dy,
                 (tc.subtitle),
-                fontsize=14,
+                fontsize=15,
                 horizontalalignment='right',
-                verticalalignment='bottom')
+                verticalalignment='bottom', weight='bold')
 
-    # Wrap text
-    fig.canvas.mpl_connect('draw_event', lambda event: on_draw(event))
+    descr = tc.description
+    if tc.meta:
+        description.text(0, 1.0,
+                         tc.domain.upper(),
+                         horizontalalignment='left',
+                         verticalalignment='bottom',
+                         fontsize=14
+                         )
+
+        description.text(1.0, 1.0,
+                         tc.velocity,
+                         horizontalalignment='right',
+                         verticalalignment='bottom',
+                         fontsize=12
+                         )
+        descr_pos = 0.8  # Where to position the rest.
+    else:
+        descr_pos = 1.0
 
     # Paragraph description
     # -----------------------------------------------------#
-    description.text(0, 1.0,
-                     tc.description,
+    description.text(0, descr_pos,
+                     descr,
                      horizontalalignment='left',
                      verticalalignment='top',
-                     fontsize=12
+                     fontsize=12, family='serif'
                      )
 
     description.axis('off')
+
+    # Wrap text
+    fig.canvas.mpl_connect('draw_event', lambda event: on_draw(event, description))
 
     # Map
     # ---------------------------------------------------------#
@@ -128,7 +151,7 @@ def plot(tc):
                 ax=locmap)
 
     # Finish drawing the basemap.
-    draw_basemap(m)
+    draw_basemap(m, tc)
 
     for layer, details in tc.locmap.layers.items():
         data = getattr(tc.locmap, layer)
@@ -164,6 +187,10 @@ def plot(tc):
     line_t = utils.utm2lola(tc.data)
     plot_line(m, line_t, colour='r', lw=3)
 
+    # Adjust border thickness
+    [i.set_linewidth(8) for i in locmap.spines.itervalues()]
+    [i.set_color("white") for i in locmap.spines.itervalues()]
+
     # Elevation and bedrock plot
     # -----------------------------------------------------------#
     print "Elevation"
@@ -185,6 +212,10 @@ def plot(tc):
                       linewidth=0,
                       color=color.flatten())
 
+        elevation.plot(tc.elevation.coords[idx],
+                      tc.elevation.data[idx],
+                      lw=0.5, color='k')
+
     max_height = np.amax(tc.elevation.all_data)
 
     elevation.set_ylim((0, max_height))
@@ -198,14 +229,16 @@ def plot(tc):
     elevation.grid(True)
     elevation.tick_params(axis='x', which='major', labelsize=0)
     elevation.xaxis.grid(True, which='major')
-    elevation.text(500, 0.8*max_height,
+    elevation.text(0.01, 0.8,
                    "Elevation",
                    props, va='bottom',
-                   fontsize=10)
-    elevation.text(500, 0.75*max_height,
+                   fontsize=11, weight='bold',
+                   transform=elevation.transAxes)
+    elevation.text(0.01, 0.75,
                    "Surface geology",
                    props, va='top',
-                   fontsize=10)
+                   fontsize=10,
+                   transform=elevation.transAxes)
     elevation.set_frame_on(False)
     for tick in elevation.get_xaxis().get_major_ticks():
         tick.set_pad(-8.)
@@ -215,32 +248,36 @@ def plot(tc):
     # ------------------------------------------------------------#
     print "Seismic"
     for coords, data in zip(tc.seismic.coords, tc.seismic.data):
-        im = xsection.imshow(data,
+
+        max_z = data["traces"].shape[0] * data["sample_interval"]
+        im = xsection.imshow(data["traces"],
                              extent=[np.amin(coords) / 1000.0,
                                      np.amax(coords) / 1000.0,
-                                     tc.range[-1], 0],
+                                     max_z, 0],
                              aspect="auto", cmap=tc.seismic_cmap)
 
     # Horizons
     colours = ['b', 'g', 'orange', 'c', 'magenta', 'pink']
     for i, (horizon, data) in enumerate(tc.horizons.data.items()):
+
         coords = tc.horizons.coords[horizon]
         xsection.scatter(coords/1000, data,
                          color=colours[i],
                          marker='.')
 
         # labels
-        xsection.text(0.025, 0.025*(i+1),
+        xsection.text(0.01, 0.025*(i+1),
                       horizon,
                       transform=xsection.transAxes,
                       ha='left', color=colours[i],
                       va='center', fontsize=12)
 
+    # Axes etc.
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
     xsection.set_xticklabels([])
-    if tc.domain.lower() in ['depth', 'd']:
+    if tc.domain.lower() in ['depth', 'd', 'z']:
         xsection.set_ylabel("Depth [m]", fontsize=8)
     else:
         xsection.set_ylabel("TWTT [ms]", fontsize=8)
@@ -248,22 +285,27 @@ def plot(tc):
     xsection.tick_params(axis='x', which='major', labelsize=0)
     xsection.yaxis.grid(True, which='major')
     xsection.xaxis.grid(True, which='major')
-    #xsection.grid(True)
     xsection.set_frame_on(False)
 
     # Seismic colorbar
-    # extreme = max(np.amax(data), abs(np.amin(data)))
     colorbar_ax = add_subplot_axes(xsection, [0.975, 0.025, 0.01, 0.1])
     fig.colorbar(im, cax=colorbar_ax)
-    colorbar_ax.text(0.5, 0.9, "+", weight='bold',
+    colorbar_ax.text(0.5, 0.9, "+",
                      transform=colorbar_ax.transAxes,
                      ha='center', color='white',
                      va='center', fontsize=12)
-    colorbar_ax.text(0.5, 0.1, "-", weight='bold',
+    colorbar_ax.text(0.5, 0.15, "-",
                      transform=colorbar_ax.transAxes, color='k',
-                     ha='center', va='center', fontsize=12)
+                     ha='center', va='center', fontsize=16)
     colorbar_ax.set_axis_off()
 
+    # Title
+    xsection.text(0.01, 0.99,
+                  "Seismic",
+                  color='k',
+                  ha='left', va='top',
+                  fontsize=12, weight='bold',
+                  transform=xsec_logs.transAxes)
     # Potential field data
     # -----------------------------------------------------------#
     print "Potfields"
@@ -273,7 +315,7 @@ def plot(tc):
         rect = [0, bot, 1, height]
         this_ax = add_subplot_axes(potfield, rect)
 
-        this_ax.scatter(payload['coords'],
+        sc = this_ax.scatter(payload['coords'],
                         payload['data'],
                         c=payload['colour'],
                         cmap=payload['cmap'],
@@ -289,26 +331,36 @@ def plot(tc):
         scale = payload['scale']
         if scale:
             this_ax.set_ylim(float(scale[1]), float(scale[0]))
-        ymax = this_ax.get_ylim()[1]
-        this_ax.text(500, ymax, field,
-                     va='top',
-                     fontsize=10,
-                     color='k')
+
+        if payload['colour_is_file']:
+            tcol = '#555555'
+        else:
+            tcol = payload['colour']
+
+        this_ax.text(0.01, 0.01, field,
+                     ha='left', va='bottom',
+                     fontsize=10, color=tcol,
+                     transform=this_ax.transAxes)
+
+        # potfield colorbar
+        # TODO: This doesn't work.
+        if payload.get('cmap'):
+            # pf_cbar_ax = add_subplot_axes(this_ax, [0.975, 0.1, 0.01, 0.8])
+            # fig.colorbar(sc, cax=pf_cbar_ax)
+            # pf_cbar_ax.set_axis_off()
+            pass
 
     potfield.axis(plot_axis)
-    #potfield.set_xlim([tc.extents[0] / 1000., tc.extents[1] / 1000.])
-
-    # Would be nice but doesn't seem to honour power limits.
-    #fmt = ScalarFormatter()
-    #fmt.set_powerlimits((-3, 3))
-    #potfield.xaxis.set_major_formatter(fmt)
-
     potfield.set_frame_on(False)
     potfield.set_yticks([])
     potfield.xaxis.grid(True, which='major')
     potfield.tick_params(axis='x', which='major', labelsize=10)
-    potfield.set_xlabel("Transect range [km]", fontsize=10)
+    potfield.set_xlabel("Transect range [km]", fontsize=10, ha='center')
 
+    potfield.text(0.01, 1.0, "Potential fields",
+                  ha='left', va='top',
+                  fontsize=11, weight='bold', color='k',
+                  transform=potfield.transAxes)
     # Log overlays
     # --------------------------------------------------------#
     print "Logs"
@@ -320,8 +372,8 @@ def plot(tc):
             if not well_colour:
                 well_colour = 'k'
 
+    c = tc.seismic_log_colour
     for name, las, pos in zip(tc.log.names, tc.log.data, tc.log.coords):
-        c = tc.seismic_log_colour
 
         if name == tc.feature_well:
             alpha, lw = 0.5, 1.5
@@ -333,10 +385,20 @@ def plot(tc):
         if las:
             data = np.nan_to_num(las.data[tc.seismic_log])
             data /= np.amax(data)
+            z = las.data['DEPT']
+
+            if tc.domain.lower() in ['time', 'twt', 'twtt', 't']:
+                dt = 0.001
+                data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
+                start = tc.seismic.velocity.depth2timept(las.start, pos)
+                z = np.arange(0, len(data), 1) + 1000*start  # ms
+
+            # Some post-processing for display
             lgsc = 0.015  # hack to compress the log width
             data *= lgsc * (tc.extents[1] - tc.extents[0])
-            data += pos - 0.5 * np.amax(data)
-            z = las.data['DEPT']
+            if data.size > 0:
+                data += pos - 0.5 * np.amax(data)
+
             xsec_logs.axvline(x=pos,
                               color=well_colour,
                               alpha=alpha,
@@ -365,16 +427,17 @@ def plot(tc):
                        weight=weight)
 
     # Log type annotation, top left
-    xsec_logs.text(500, 20,
+    xsec_logs.text(0.01, 0.965,
                    tc.seismic_log+' log',
                    color=c,
-                   va='top',
-                   fontsize=12)
+                   ha='left', va='top',
+                   fontsize=12,
+                   transform=xsec_logs.transAxes)
 
     #  Feature plot
     # -----------------------------------------------------#
-    print "Feature plot"
     if tc.feature_well:
+        print "Feature well:", tc.feature_well
         log_header.text(0.0, 1.0,
                         ("Well " + tc.feature_well),
                         verticalalignment='top',
@@ -382,44 +445,67 @@ def plot(tc):
                         fontsize=14,
                         fontweight='bold'
                         )
-        log_header.axis("off")
+
+        # horizontal line
+        log_header.axhline(y=0.5,
+                           xmin=0,
+                           xmax=1.25,
+                           linewidth=1,
+                           color='k')
 
         plot_feature_well(tc, gs)
+    else:
+        Notice.warning("No feature well")
 
-    # Logo
+    log_header.axis("off")
+
+    # Logo etc.
     # --------------------------------------------------------------#
     print "Logo"
-    # path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
-    # im = Image.open(path)
-    # im = np.array(im).astype(np.float) / 255
 
-    # logo.axhline(y=0.7,
-    #              xmin=0.1,
-    #              xmax=0.9,
-    #              linewidth=1,
-    #              color='k')
-    # logo.imshow(im)
-    # logo.axis("off")
+    try:
+        path = os.path.join(tc.data_dir, tc.settings['logo_file'])
+        im = Image.open(path)
+        im.thumbnail((fig.dpi, fig.dpi), Image.ANTIALIAS)
+    except IOError:
+        print "Image is missing", path
+        im = np.zeros((1, 1, 3))
 
-    # try:
-    #     path = os.path.join(tc.data_dir, tc.settings['logo_file'])
-    #     print path
-    #     im = Image.open(path)
-    #     im = im.thumbnail((100, 100), Image.ANTIALIAS)
-    #     w, h = im.size
-    # except IOError:
-    #     print "Image is missing", path
+    w, h = im.size
 
-    # # We need a float array between 0-1, rather than
-    # # a uint8 array between 0-255
-    # im = np.array(im).astype(np.float) / 255
+    # We need a float array between 0-1, rather than
+    # a uint8 array between 0-255
+    im = np.array(im).astype(np.float) / 255
 
-    # # With newer (1.0) versions of matplotlib, you can
-    # # use the "zorder" kwarg to make the image overlay
-    # # the plot, rather than hide behind it... (e.g. zorder=10)
-    # fig.figimage(im, fig.bbox.xmax - w, fig.bbox.ymax - h)
+    # With newer (1.0) versions of matplotlib, you can
+    # use the "zorder" kwarg to make the image overlay
+    # the plot, rather than hide behind it... (e.g. zorder=10)
+    fig.figimage(im, (0.95*fig.bbox.xmax) - w, (0.96*fig.bbox.ymax) - h)
+
+    # Annotate config file and creation date
+    plt.figtext(0.950, 0.030, tc.time,
+                ha="right", va="bottom", color="gray", size=8)
+    plt.figtext(0.950, 0.04, tc.config_file,
+                ha="right", va="bottom", color="gray", size=8)
+
+    year = datetime.datetime.now().year
+    text = "$\copyright$ {} Department of Energy".format(year)
+    plt.figtext(0.750, 0.03, text,
+                ha="left", va="bottom", color="gray", size=8)
 
     # Finish
     # --------------------------------------------------------------#
-    plt.show()
-    #plt.savefig("test.png")
+    save_file = getattr(tc, 'save_file', None)
+    if save_file:
+        if type(save_file) != 'str':
+            # Then it's probably a bool from 'yes' or 'true' in the config
+            save_file = tc.config_file.split('.')[0] + '.png'
+            if save_file == 'config.png':
+                save_file = 'temp.png'
+        Notice.ok("Saving file "+save_file+"...", hold=True)
+        plt.savefig(save_file, dpi=fig.dpi)
+        Notice.ok("Done")
+        Notice.warning("The displayed image is not identical to the saved one")
+        plt.show()
+    else:
+        plt.show()

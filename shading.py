@@ -3,6 +3,8 @@
 """
 Defines a hillshade function that's a bit nicer than the one in matplotlib.
 
+Not currently being used in geotransect, but it will be.
+
 http://rnovitsky.blogspot.ca/2010/04/using-hillshade-image-as-intensity.html
 
 :copyright: 2015 Ran Novitsky Nof

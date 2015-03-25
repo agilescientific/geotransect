@@ -10,8 +10,10 @@ raster_extensions:
     - grd
     - asc
 buffer: 1000
-fine_buffer: 100
+fine_buffer: 100  # To specify a different buffer for horizon data
 map_padding: 10000
 default_colour: blue     # http://ageo.co/namedcolours
 default_cmap: gist_heat  # http://ageo.co/modelrcolour
 curve_display: Petrophysics_display_template.csv
+curve_smooth_window: 51
+default_dpi: 150

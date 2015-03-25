@@ -27,7 +27,7 @@ def plot_line(m, line, colour='b', lw=1, alpha=1):
         colour (str): A colour from the matplotlib dictionary.
 
     Returns:
-        List: A list of matplotlib lines.
+        list: A list of matplotlib lines.
     """
     lo, la = line.xy
     x, y = m(lo, la)
@@ -55,7 +55,7 @@ def plot_point(m, point, colour='b', shape='o', alpha=1, zorder=None):
         colour (str): A colour from the matplotlib dictionary.
 
     Returns:
-        List: A list of matplotlib points.
+        list: A list of matplotlib points.
     """
     lo, la = point.xy
     x, y = m(lo, la)
@@ -66,22 +66,37 @@ def plot_point(m, point, colour='b', shape='o', alpha=1, zorder=None):
                      zorder=zorder)
 
 
-def draw_basemap(m):
+def draw_basemap(m, tc):
     """
     Puts some standard bits of decoration on a matplotlib Basemap.
 
     Args:
         m (Basemap): A matplotlib Basemap.
+        tc (TransectContainer): We need the map edges from the
+            active container. Ideally we'd get them out of the
+            Basemap object, but I can't see how to do this.
 
     Returns:
-        m (Basemap): The newly decorated Basemap.
+        Basemap: The newly decorated Basemap.
     """
-    m.drawcoastlines(color='#9caf9c')
+    m.drawmapboundary(fill_color='#ddf5fb')
+    m.drawcoastlines(color='#afd1e4')
     m.drawcountries()
-    m.fillcontinents(color='#d8e3d8')
-    m.drawmapboundary(color='gray')
-    m.drawmeridians(np.arange(0, 360, 1), color='gray')
-    m.drawparallels(np.arange(-90, 90, 1), color='gray')
+    m.fillcontinents(color='#d6e5d6', lake_color='#ddf5fb')
+    m.drawmeridians(np.arange(0, 360, 0.5),
+                    color='gray',
+                    labels=[False, False, True, False])
+    m.drawparallels(np.arange(-90, 90, 0.5),
+                    color='gray',
+                    labels=[True, False, False, False])
+    m.drawmapscale(tc.locmap.ll.x + 0.2, tc.locmap.ll.y + 0.075,
+                   tc.locmap.ll.x, tc.locmap.ll.y,
+                   20.,
+                   barstyle='fancy', labelstyle='simple',
+                   fillcolor1='w', fillcolor2='#555555',
+                   fontcolor='#555555',
+                   zorder=5)
+
     return m
 
 

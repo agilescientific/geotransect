@@ -3,42 +3,102 @@
 # Configuration file for geotransect.py
 
 # Params are passed directly to the TransectContainer object, and all of the
-# Containers it contains. So you have access to them everywhere. 
+# Containers it contains, so you have easy access to them everywhere.
 params:
-    title: Transect 1 
-    basin: Windsor  # We should get this from the basins shapefile 
-    id: 1
-    description: This transect is the one we are using to test this module. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-    domain: depth  # Not currently used
-    buffer: 300
-    depth:
-        - 0
-        - 3000
-    data_dir: data
-    images_dir: images
-    feature_well: # P-129
-    seismic_log: GR  # Not currently used
-    curve_display: templates/Petrophysics_display_template.csv
+    title: Transect 1         # A name or title for the transect.
+    subtitle: Windsor Basin   # A subtitle for the transect.
+    id: 1                     # The id of the transect in the SHP file.
+
+    # The description is a long piece of free text describing the transect.
+    description: Transect used for testing geotransect.
+    meta: on                  # Whether to print more info in the header.
+    domain: time              # Time or depth.
+    range:                    # The vertical range of the cross-section view.
+        - 0                   # The top, in ms or m.
+        - 4000                # The bottom, in the same units.
+
+    # This will be prepended to every other file and directory name.
+    data_dir: /Users/matt/Dropbox/geotransect_test/data
+
+    # Various other settings.
+    seismic_cmap: Greys       # http://ageo.co/modelrcolour
+    seismic_log: GR           # The log to display on the seismic section.
+    seismic_log_colour: lime  # The colour to show the log.
+    feature_well: P-129       # The feature well.
+    striplog: lithology       # The name of the striplog to use.
+
+    # You can put settings you don't change very often into another file.
+    settings: !include settings.yaml
 
 # Data strings are always interpreted as paths relative to data_dir in params.
 # They are passed to specific data containers. If we need a specific GIS layer,
 # then we want a filename. If we need a directory of data, then we want a dir.
 # This interface should evolve with use.
 data:
-    transect_file: transects/Transects.shp
+    transect_file: transects/Transects.shp     # A shape file.
+
+    # The seismic directory should contain SEG-Y files. It can have subfolders.
+    # Note that the SEG-Y files must have correct navigation in their headers.
     seismic_dir: seismic
+
+    # A directory containing Petrel horizon files. If there are multiple files
+    # for a horizon, they are concatenated. The z values should be in ms.
+    horizon_dir: horizons
+
+    # A directory containing LAS files. It can have subdirectories. Curves are
+    # expected in LAS files with names like Well_out.las.
     well_dir: wells
     elevation_file: elevation/NS_DEM_ascii.asc
     bedrock_dir: bedrock
-    potfield_dir: potfield
-    basins_dir: basins  # Not currently used
-    velocity_dir: velocity
-    striplog_dir: wells
-    tops_file: wells/P-129/tops/P-129_tops.txt  # Need to make this dynamic, or just handle in well
+    tops_file: wells/data/P-129_tops.txt
 
-map:  # In layer order, top = first
-    transects: transects/Transects.shp
-    wells: wells/wells.shp
-    seismic: seismic/seismic_lines.shp
-    shade: elevation/DEM_slope.tif
-    bedrock: bedrock/p00001gb.shp
+# The velocity model can be one of 3 types: 
+#  - Constant, with data 'float'.
+#  - Simple, with data 'str' for a directory containing function files.
+#  - SEGY, with data 'str' for a directory containing SEGY files.
+velocity:
+    type: constant
+    data: 2500
+
+# You can specify any number of potential fields, or potfields, to display
+# beneath the seismic section. More than 4 will likely get quite crowded.
+# It's a good idea to ensure clean data. We're expecting UTM (NAD83) rasters.
+# You have to provide 'file', the other parameters are optional. 'Colour' can
+# be a name, a hex colour, or another grid (which doesn't seem to work). If
+# you give another grid, you should also give a colourmap. You can provide
+# 'decimate' (a NumPy 'skip'), and 'clip' (a percentile), or 'scale' to help
+# with scaling.
+potfields:
+    Bouger:
+        file: potfield/r154nsboug.grd
+        colour: potfield/canada200m_rtf_may2014_UTM.GRD
+        cmap: jet
+        scale:     # Applied to the plot (not the data).
+            - 0    # ymax
+            - -25  # ymin
+    Canada_200m:
+        file: potfield/canada200m_rtf_may2014_UTM.GRD
+        colour: red
+        clip: 99     # The clip percentile is applied to the data.
+        decimate: 1  # Increase this is grids are slow to load.
+
+# Give the map layers in order, top layer = first on this list. The names
+# you give the layers are not important, but must not collide.
+map_layers:
+    transects:
+        file: transects/Transects.shp
+        colour: blue
+        alpha: 0.67
+    wells:
+        file: wells/wells.shp
+        colour: green
+        alpha: 0.67
+    seismic:
+        file: seismic/seismic_lines.shp
+        colour: black
+        alpha: 0.33
+    #shade:
+    #    file: elevation/DEM_slope.tif
+    #bedrock:
+    # TODO: Deal with plotting polygons.
+    #    file: bedrock/p00001gb.shp

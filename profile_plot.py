@@ -3,6 +3,9 @@
 """
 Defines various data containers for plotting a transect.
 
+This file is not used in the current version of `geotransect` but is kept here
+in case it's useful later.
+
 :copyright: 2015 Agile Geoscience
 :license: Apache 2.0
 """
@@ -13,15 +16,14 @@ import numpy as np
 from scipy import fft
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-
 import obspy
+
+from plot_utils import add_subplot_axes
 
 filename = sys.argv[1]
 segyfile = os.path.basename(filename)
 
-# np.percentile and np.clip for best imshow display
-
-# Read all traces
+# Read all traces.
 section = obspy.read(filename)
 
 r_elevs = []
@@ -69,29 +71,6 @@ print "tstart", tstart
 print "tend", tend
 largest = max(np.amax(data), abs(np.amin(data)))
 
-
-def add_subplot_axes(ax, rect, axisbg='w'):
-    fig = plt.gcf()
-    box = ax.get_position()
-    width = box.width
-    height = box.height
-    inax_position = ax.transAxes.transform(rect[0:2])
-    transFigure = fig.transFigure.inverted()
-    infig_position = transFigure.transform(inax_position)
-    x = infig_position[0]
-    y = infig_position[1]
-    width *= rect[2]
-    height *= rect[3]  # <= Typo was here
-    subax = fig.add_axes([x, y, width, height], axisbg=axisbg)
-    x_labelsize = subax.get_xticklabels()[0].get_size()
-    y_labelsize = subax.get_yticklabels()[0].get_size()
-    x_labelsize *= rect[2]**0.5
-    y_labelsize *= rect[3]**0.5
-    subax.xaxis.set_tick_params(labelsize=x_labelsize)
-    subax.yaxis.set_tick_params(labelsize=y_labelsize)
-    return subax
-
-
 # MAIN PLOT
 h = (tend-tstart) / 250.0
 w = ntraces / 250.0
@@ -107,7 +86,7 @@ im = ax.imshow(data, cmap=cm.gray, origin='upper',
                        line_extents['last_trace'],
                        line_extents['end_time'],
                        line_extents['start_time']),
-               aspect = aspect*0.5
+               aspect = aspect * 0.5
                )
 ax.set_ylabel('Two-way time [ms]')
 ax.set_xlabel('Trace no.')
