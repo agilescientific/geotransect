@@ -1,13 +1,19 @@
 # geotransect
-Tool for summarizing data available along 2D transects.
+Tool for visualizing subsurface data along 2D transects.
 
 ## Dependencies
-Some of these dependencies have dependencies of their own.
+Some of these dependencies have dependencies of their own, some of which are substantial and need compiling. If you're on a Mac, I recommend using Homebrew for the tricky things like gdal and PROJ4.
 
-- [xlrd](https://github.com/python-excel/xlrd): module for reading Excel files
+- [pyproj](https://pypi.python.org/pypi/pyproj)
 - [fiona](https://github.com/sgillies/fiona): high-level shapefile read/write, wraps GDAL
 - [rasterio](https://github.com/sgillies/rasterio): high-level raster read/write, wraps GDAL
 - [shapely](https://pypi.python.org/pypi/Shapely) probably
+- [pyYAML](https://pypi.python.org/pypi/PyYAML)
 - [NumPy](https://github.com/numpy/numpy) of course
-- matplotlib
-- [loggy](https://github.com/agile-geoscience/loggy) — Under development
+- [SciPy](http://scipy.org/) for some interpolation functions
+- [matplotlib](http://matplotlib.org/) for plotting
+- [matplotlib Basemap](https://github.com/matplotlib/basemap) for maps
+- [Pillow](http://pillow.readthedocs.org/installation.html)
+- [obspy](https://github.com/obspy/obspy)
+- [agilegeo](https://github.com/agile-geoscience/agilegeo/tree/develop), for depth conversion (need **develop** branch at the moment)
+- [striplog](https://github.com/agile-geoscience/striplog)
