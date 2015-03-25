@@ -1,6 +1,8 @@
 # geotransect
 Tool for summarizing data available along 2D transects.
 
+[![Codacy Badge](https://www.codacy.com/project/badge/93547dee9364471aaacf5461b0b9ab0e)](https://www.codacy.com/app/matt/geotransect)
+
 ## Dependencies
 Some of these dependencies have dependencies of their own.
 

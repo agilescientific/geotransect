@@ -958,7 +958,7 @@ class SimpleVelocityContainer(BaseContainer):
 
                 if not loc:
                     # There were no coordinates.
-                    loc = Point((0,0))
+                    loc = Point((0, 0))
 
                 # Build up the time depth profile
                 self.profiles[loc] = []
@@ -1107,7 +1107,9 @@ class SimpleVelocityContainer(BaseContainer):
 
         # calculate the z axis
         t_in = vavg / input_depth
-        t_out = np.arange(t_in[0], t_in[-1], dt)
+        print "t_in...", t_in[0], t_in[1:5], t_in[-1]
+        print "dt.....", dt
+        t_out = np.arange(t_in[1], t_in[-1], dt)
 
         # do the conversion
         return np.interp(t_out, t_in, data, data[0], data[1])
