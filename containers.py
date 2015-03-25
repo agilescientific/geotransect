@@ -1095,21 +1095,30 @@ class SimpleVelocityContainer(BaseContainer):
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
         time = self.data[closest][:, 0]
-        depth = self.data[closest][:, 0]
+        depth = self.data[closest][:, 1]
 
         time[0] = time[1]  # divide by zero hack
         vavg = depth / time
+        print "vavg", vavg[:5], vavg[-5:]
+
+        # Get an actual interval
+        if np.size(dz) > 1:
+            dz = dz[2] - dz[1]
 
         # resample vavg to match the data
         input_depth = np.arange(data.size) * dz
+        print "dz...", dz
+        print "input_depth", input_depth[:5], input_depth[-5:]
 
         vavg = np.interp(input_depth, depth, vavg, vavg[0], vavg[1])
+        print "vavg now", vavg[:5], vavg[-5:]
 
-        # calculate the z axis
-        t_in = vavg / input_depth
+        # calculate the linear z axis
+        t_in = input_depth / vavg
+        print "len tin", len(t_in)
         print "t_in...", t_in[0], t_in[1:5], t_in[-1]
         print "dt.....", dt
-        t_out = np.arange(t_in[1], t_in[-1], dt)
+        t_out = np.arange(t_in[0], t_in[-1], dt)
 
         # do the conversion
         return np.interp(t_out, t_in, data, data[0], data[1])

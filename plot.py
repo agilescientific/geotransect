@@ -348,7 +348,8 @@ def plot(tc):
             # Some post-processing for display
             lgsc = 0.015  # hack to compress the log width
             data *= lgsc * (tc.extents[1] - tc.extents[0])
-            data += pos - 0.5 * np.amax(data)
+            if data.size > 0:
+                data += pos - 0.5 * np.amax(data)
 
             xsec_logs.axvline(x=pos,
                               color=well_colour,
