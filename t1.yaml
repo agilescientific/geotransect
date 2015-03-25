@@ -9,7 +9,7 @@ params:
     subtitle: Windsor Basin
     id: 1
     description: Transect used for testing geotransect.
-    domain: time
+    domain: depth
     range:
         - 0
         - 3000

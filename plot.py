@@ -339,7 +339,7 @@ def plot(tc):
             z = las.data['DEPT']
 
             if tc.domain.lower() in ['time', 'twt', 'twtt', 't']:
-                print "Time-converting section well", name, "Start:",
+                print "Time-converting section well", name
                 dt = 0.001
                 data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
                 start = tc.seismic.velocity.depth2timept(las.start, pos)

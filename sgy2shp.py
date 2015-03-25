@@ -38,6 +38,9 @@ utm_nad83 = pp.Proj("+init=EPSG:26920")
 
 
 class ShapeFileExists(Exception):
+    """
+    Generic error class.
+    """
     pass
 
 
@@ -145,10 +148,11 @@ def sgy2shp(input_dir, output_dir, convert=False):
 
 
 def main():
-
+    """
+    Uses this if called as __main__.
+    """
     input_dir = sys.argv[1]
     output_dir = sys.argv[2]
-
     sgy2shp(input_dir, output_dir)
 
 if __name__ == "__main__":

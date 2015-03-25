@@ -39,6 +39,9 @@ import utils
 
 
 class ContainerError(Exception):
+    """
+    Generic error class
+    """
     pass
 
 
