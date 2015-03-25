@@ -534,7 +534,7 @@ class SeismicContainer(SegyContainer):
                     traces.append(self.velocity.time2depth(newt,
                                                            coord,
                                                            s/1000,
-                                                           s))
+                                                           1.))
 
                 else:
                     traces.append(newt)
