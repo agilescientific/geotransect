@@ -156,11 +156,11 @@ def plot(tc):
                                alpha=0.5)
                 lo, la = point_t.xy
                 x, y = m(lo, la)
-                # Plot the names of wells in the xsection
-                # When we have names we can also plot special symbol
-                # for the feature well.
+                Plot the names of wells in the xsection
+                When we have names we can also plot special symbol
+                for the feature well.
 
-    # Plot this transect line
+    Plot this transect line
     line_t = utils.utm2lola(tc.data)
     plot_line(m, line_t, colour='r', lw=3)
 
@@ -223,25 +223,19 @@ def plot(tc):
     # ------------------------------------------------------------#
     print "Seismic"
     for coords, data in zip(tc.seismic.coords, tc.seismic.data):
-        im = xsection.imshow(data,
+
+        max_z = data["traces"].shape[0] * data["sample_interval"]
+        print max_z
+        im = xsection.imshow(data["traces"],
                              extent=[np.amin(coords) / 1000.0,
                                      np.amax(coords) / 1000.0,
-                                     tc.range[-1], 0],
+                                     max_z, 0],
                              aspect="auto", cmap=tc.seismic_cmap)
 
     # Horizons
     colours = ['b', 'g', 'orange', 'c', 'magenta', 'pink']
     for i, (horizon, data) in enumerate(tc.horizons.data.items()):
 
-        # If we're in depth, we need to depth-convert the horizons.
-        if tc.domain.lower() in ['depth', 'd', 'z']:
-            print "Time-converting horizon", horizon
-            # TODO: PROPER DEPTH-CONVERTER CODE HERE
-            # This will only work for constant velocities
-            data = (data/2000.) * tc.horizons.velocity.velocity
-        else:
-            # Seismic is in time, leave the horizons alone.
-            pass
 
         coords = tc.horizons.coords[horizon]
         xsection.scatter(coords/1000, data,
@@ -255,7 +249,7 @@ def plot(tc):
                       ha='left', color=colours[i],
                       va='center', fontsize=12)
 
-    # Axes etc.
+    ## # Axes etc.
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
@@ -467,4 +461,5 @@ def plot(tc):
         print "Saving file", save_file
         plt.savefig(save_file)
     else:
+        plt.savefig("test.png")
         plt.show()

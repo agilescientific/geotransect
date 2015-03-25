@@ -9,12 +9,12 @@ params:
     subtitle: Windsor Basin
     id: 1
     description: Transect used for testing geotransect.
-    domain: time
+    domain: depth
     range:
         - 0
-        - 4000
-    #dz: 4  # Needed for depth conversion
-    data_dir: /Users/matt/Dropbox/geotransect_test/data
+        - 8000
+    dz: 4.0  # Needed for depth conversion
+    data_dir: data
     seismic_cmap: Greys  # http://ageo.co/modelrcolour
     seismic_log: GR
     seismic_log_colour: lime
