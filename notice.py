@@ -26,6 +26,7 @@ class Notice(object):
 
     @classmethod
     def title(cls):
+        """Makes a logo."""
         logo = """
                   _                                 _
                  | |                               | |
@@ -40,21 +41,26 @@ class Notice(object):
 
     @classmethod
     def warning(cls, string):
+        """Red."""
         return cls(string, 'WARNING')
 
     @classmethod
     def header(cls, string):
+        """Pink."""
         return cls('\n'+string+'\n', 'HEADER')
 
     @classmethod
     def hr_header(cls, string):
+        """Pink."""
         hr = "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
         return cls(hr+string.upper(), 'HEADER')
 
     @classmethod
     def info(cls, string):
+        """Blue."""
         return cls('\n'+string, 'INFO')
 
     @classmethod
     def ok(cls, string):
+        """Green."""
         return cls(string, 'OK')

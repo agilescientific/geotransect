@@ -156,11 +156,11 @@ def plot(tc):
                                alpha=0.5)
                 lo, la = point_t.xy
                 x, y = m(lo, la)
-                Plot the names of wells in the xsection
-                When we have names we can also plot special symbol
-                for the feature well.
+                # Plot the names of wells in the xsection
+                # When we have names we can also plot special symbol
+                # for the feature well.
 
-    Plot this transect line
+    # Plot this transect line
     line_t = utils.utm2lola(tc.data)
     plot_line(m, line_t, colour='r', lw=3)
 
@@ -225,7 +225,6 @@ def plot(tc):
     for coords, data in zip(tc.seismic.coords, tc.seismic.data):
 
         max_z = data["traces"].shape[0] * data["sample_interval"]
-        print max_z
         im = xsection.imshow(data["traces"],
                              extent=[np.amin(coords) / 1000.0,
                                      np.amax(coords) / 1000.0,
@@ -235,7 +234,6 @@ def plot(tc):
     # Horizons
     colours = ['b', 'g', 'orange', 'c', 'magenta', 'pink']
     for i, (horizon, data) in enumerate(tc.horizons.data.items()):
-
 
         coords = tc.horizons.coords[horizon]
         xsection.scatter(coords/1000, data,
@@ -249,7 +247,7 @@ def plot(tc):
                       ha='left', color=colours[i],
                       va='center', fontsize=12)
 
-    ## # Axes etc.
+    # Axes etc.
     plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
@@ -265,7 +263,6 @@ def plot(tc):
     xsection.set_frame_on(False)
 
     # Seismic colorbar
-    # extreme = max(np.amax(data), abs(np.amin(data)))
     colorbar_ax = add_subplot_axes(xsection, [0.975, 0.025, 0.01, 0.1])
     fig.colorbar(im, cax=colorbar_ax)
     colorbar_ax.text(0.5, 0.9, "+",
@@ -342,10 +339,11 @@ def plot(tc):
             z = las.data['DEPT']
 
             if tc.domain.lower() in ['time', 'twt', 'twtt', 't']:
-                print "Time-converting section well", name
+                print "Time-converting section well", name, "Start:",
                 dt = 0.001
                 data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
-                z = np.arange(0, len(data), 1)
+                start = tc.seismic.velocity.depth2timept(las.start, pos)
+                z = np.arange(0, len(data), 1) + 1000*start  # ms
 
             # Some post-processing for display
             lgsc = 0.015  # hack to compress the log width
@@ -412,17 +410,6 @@ def plot(tc):
     # Logo etc.
     # --------------------------------------------------------------#
     print "Logo"
-    # path = os.path.join(tc.data_dir, tc.settings['images_dir'], 'logo.png')
-    # im = Image.open(path)
-    # im = np.array(im).astype(np.float) / 255
-
-    # logo.axhline(y=0.7,
-    #              xmin=0.1,
-    #              xmax=0.9,
-    #              linewidth=1,
-    #              color='k')
-    # logo.imshow(im)
-    # logo.axis("off")
 
     try:
         path = os.path.join(tc.data_dir, tc.settings['logo_file'])
@@ -430,7 +417,7 @@ def plot(tc):
         im.thumbnail((90, 90), Image.ANTIALIAS)
     except IOError:
         print "Image is missing", path
-        im = np.zeros((1,1,3))
+        im = np.zeros((1, 1, 3))
 
     w, h = im.size
 

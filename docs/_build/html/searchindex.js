@@ -1,0 +1,1 @@
+Search.setIndex({envversion:46,filenames:["containers","index","plot"],objects:{},objnames:{},objtypes:{},terms:{content:1,index:1,modul:1,page:1,plot:1,search:1},titles:["Containers","Plot","Welcome to geotransect&#8217;s documentation!"],titleterms:{contain:0,document:1,geotransect:1,indic:1,plot:2,tabl:1,welcom:1}})

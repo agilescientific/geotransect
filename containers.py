@@ -12,12 +12,10 @@ from functools import partial
 import time
 
 # Optional backend specification
-import matplotlib; matplotlib.use("WX")
+# import matplotlib; matplotlib.use("WX")
 
 # Import required to avoid bug in Basemap
 from mpl_toolkits.basemap import Basemap
-
-
 
 # 3rd party
 import matplotlib.pyplot as plt
@@ -500,14 +498,19 @@ class SeismicContainer(SegyContainer):
     """
 
     def __init__(self, seis_dir, velocity, params):
-
         # First generate the parent object.
         super(SeismicContainer, self).__init__(seis_dir, params)
-
         self.velocity = velocity
 
     def update(self, transect):
+        """
+        Gather the data near the transect. Depth convert if necessary.
 
+        Returns nothing. Side effect: sets attributes.
+
+        Args:
+            transect (LineString): A shapely LineString object.
+        """
         # Do the super class
         super(SeismicContainer, self).update(transect)
 
@@ -517,20 +520,18 @@ class SeismicContainer(SegyContainer):
             # Through traces
             traces = []
             for trace, coord in zip(segydata, coords):
-                print '.',
-
+                # Get the sample rate, in Hz.
                 samp = trace.stats["sampling_rate"]
 
                 if self.domain.lower() in ['depth', 'd', 'z']:
-                    traces.append(self.velocity.time2depth(trace.data,
-                                                           coord,
-                                                           1/samp,
-                                                           self.dz))
+                    trz = self.velocity.time2depth(trace.data, coord, 1/samp,
+                                                   self.dz)
+                    traces.append(trz)
                     samp = 1.0/self.dz
 
                 else:
                     traces.append(trace.data)
-                    samp*=1000.0
+                    samp /= 1000.0
 
             struct = {"sample_interval": 1.0/samp,
                       "traces": np.transpose(np.array(traces))}
@@ -548,11 +549,6 @@ class HorizonContainer(BaseContainer):
         velocity (Object): A velocity container for time-depth
                            conversion.
         params (dict): The parameters, as specified in the config.
-
-    Example:
-        >>> seis_dir = 'seismic/segy_files/'
-        >>> params = {'domain': 'depth', 'buffer': 300, ... }
-        >>> seis = seismicContainer(seis_dir, params)
     """
 
     def __init__(self, hor_dir, velocity, params):
@@ -582,27 +578,33 @@ class HorizonContainer(BaseContainer):
                 self.lookup[name] = points
 
     def update(self, transect):
+        """
+        Gather the data near the transect. Depth convert if necessary.
+
+        Returns nothing. Side effect: sets attributes.
+
+        Args:
+            transect (LineString): A shapely LineString object.
+        """
         Notice.info("Updating " + self.__class__.__name__)
 
         b = self.settings['fine_buffer']
         prepared = prep(transect.buffer(b))
 
         for horizon, points in self.lookup.items():
-
             l = len(points)
             points = filter(prepared.contains, points)
-            print horizon, len(points), "of", l
-
+            print horizon, len(points), "of", l, "points"
             data, coords = [], []
             for p in points:
                 coords.append(transect.project(p))
                 if self.domain.lower() in ['depth', 'd', 'z']:
-                    data.append(self.velocity.time2depthpt(p.z,
-                                                           coords[-1]))
+                    "Depth converting horizon"
+                    zpt = self.velocity.time2depthpt(p.z/1000, coords[-1])
+                    data.append(zpt)
                 else:
                     data.append(p.z)
 
-            
             self.data[horizon] = np.array(data)
             self.coords[horizon] = np.array(coords)
 
@@ -683,6 +685,11 @@ class PotfieldContainer(BaseContainer):
             self.data[name] = payload
 
     def __get_all_data(self, params, colour=False):
+        """
+        Just a raster data reader.
+
+        TODO: Needs refactoring.
+        """
         with rasterio.drivers(CPL_DEBUG=True):
 
             if colour:
@@ -811,19 +818,21 @@ class LogContainer(BaseContainer):
         """
         return self.log_lookup.get(log_id)
 
-    def get_point(self, log_id):
+    # def get_point(self, log_id):
+    #     ids = self.lookup.values()
+    #     points = self.lookup.keys()
+    #     index = ids.index(log_id)
 
-        ids = self.lookup.values()
-        points = self.lookup.keys()
-        index = ids.index(log_id)
-
-        if index:
-            return points[index]
-        else:
-            return None
+    #     if index:
+    #         return points[index]
+    #     else:
+    #         return None
 
 
 class VelocityError(Exception):
+    """
+    Gerneric error class.
+    """
     pass
 
 
@@ -833,9 +842,7 @@ class ConstantVelocityContainer(BaseContainer):
     """
 
     def __init__(self, velocity, params):
-
         super(ConstantVelocityContainer, self).__init__(params)
-
         self.velocity = velocity
 
     def update(self, transect):
@@ -844,32 +851,34 @@ class ConstantVelocityContainer(BaseContainer):
         """
         pass
 
-
     def depth2timept(self, d, point):
         """
         Converts a single sample from depth to time.
 
-        args:
-            d (float): depth in meters
-            point (float): range along transect
+        Args:
+            d (float): Depth in metres.
+            point (float): Range along transect in m. Not used
+                here, only for consistent API.
 
-        returns: twt [s]
+        Returns:
+            Float: TWT [s]
         """
-
         return 2*d/self.velocity
-    
+
     def time2depthpt(self, t, point):
         """
         Converts a single sample from time to depth.
 
-        args:
-            t (float): twt in seconds
-            point (float): range along transect
-        """
+        Args:
+            t (float): TWT in seconds.
+            point (float): Range along transect. Not used
+                here, only for consistent API.
 
+        Returns:
+            Float: Depth [m].
+        """
         return t*self.velocity/2.0
 
-    
     def time2depth(self, data, point, dt, dz):
         """
         Converts a data array from time to depth
@@ -902,14 +911,13 @@ class ConstantVelocityContainer(BaseContainer):
             dt (float): The sample interval of the converted
                         data.
         """
-
         velocity = self.velocity
         return depth_to_time(data, np.ones(data.size)*velocity, dz, dt)
 
 
 class SimpleVelocityContainer(BaseContainer):
     """
-    Class for handling simple velocity profiles read from csv/text
+    Class for handling simple velocity profiles read from text
     files. Simple example below, # are not parsed and are used as
     comments.
 
@@ -928,7 +936,7 @@ class SimpleVelocityContainer(BaseContainer):
         super(SimpleVelocityContainer, self).__init__(params)
 
         self.profiles = {}
-        for profile in fnmatch.filter(os.listdir(vel_dir), '*.vel'):
+        for profile in fnmatch.filter(os.listdir(vel_dir), '*.txt'):
 
             with open(os.path.join(vel_dir, profile), 'r') as f:
 
@@ -936,10 +944,9 @@ class SimpleVelocityContainer(BaseContainer):
                 header = False
                 loc = None
                 while not header:
-
                     l = f.readline().lstrip()
                     if l.startswith('#'):
-                        pass
+                        header = True
                     elif l.startswith('coordinates'):
 
                         x, y = l.split(',')[1:]
@@ -949,6 +956,10 @@ class SimpleVelocityContainer(BaseContainer):
                         loc = Point((x, y))
                         header = True
 
+                if not loc:
+                    # There were no coordinates.
+                    loc = Point((0,0))
+
                 # Build up the time depth profile
                 self.profiles[loc] = []
                 for line in f.readlines():
@@ -957,12 +968,25 @@ class SimpleVelocityContainer(BaseContainer):
                     if line.strip().startswith('#'):
                         continue
 
-                    if(len(line.strip().split(',')) == 2):
+                    if len(line.strip().split(',')) == 2:
                         time, depth = line.strip().split(',')
+                    elif len(line.strip().split()) == 2:
+                        time, depth = line.strip().split()
+                    else:
+                        Notice.warning("Could not read velocity file.")
+                        continue
 
-                        self.profiles[loc].append([float(time), float(depth)])
+                    self.profiles[loc].append([float(time), float(depth)])
 
     def update(self, transect):
+        """
+        Gather the data near the transect. Depth convert if necessary.
+
+        Returns nothing. Side effect: sets attributes.
+
+        Args:
+            transect (LineString): A shapely LineString object.
+        """
         self.data = []
         self.coords = []
 
@@ -982,21 +1006,22 @@ class SimpleVelocityContainer(BaseContainer):
         """
         Converts a single sample from time to depth.
 
-        args:
-            t (float): twt in seconds
-            point (float): range along transect
-        """
+        Args:
+            t (float): TWT in seconds.
+            point (float): Range along transect [m].
 
-         # Find the nearest profile
+        Returns:
+            Float: Depth in m.
+        """
+        # Find the nearest profile
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
 
         time = self.data[closest][:, 0]
         depth = self.data[closest][:, 1]
-        
+
         return np.interp(t, time, depth)
 
-        
     def depth2timept(self, d, point):
         """
         Converts a single sample from depth to time.
@@ -1007,20 +1032,29 @@ class SimpleVelocityContainer(BaseContainer):
 
         returns: twt [s]
         """
-
-         # Find the nearest profile
+        # Find the nearest profile
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
 
         time = self.data[closest][:, 0]
         depth = self.data[closest][:, 1]
-        
+
         return np.interp(d, depth, time)
-        
 
-        
     def time2depth(self, data, point, dt, dz):
+        """
+        Converts a data array from time to depth
 
+        Args:
+            data (array, 1d): A 1D numpy array.
+            point (float):  distance along transect corresponding to
+            the trace location. Not actually used, as this model
+            assumes a constant velocity
+
+            dt (float): The sample interval of the input data.
+            dz (float): The sample interval of the depth converted
+                        data.
+        """
         # Find the nearest profile
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
@@ -1044,11 +1078,22 @@ class SimpleVelocityContainer(BaseContainer):
         return np.interp(z_out, z_in, data, data[0], data[1])
 
     def depth2time(self, data, point, dz, dt):
+        """
+        Converts a data array in the depth domain to the time
+        domain.
 
+        Args:
+            data (array, 1d): A 1D numpy array.
+            point (float):  distance along transect corresponding to
+                the trace location. Not actually used, as this model
+                assumes a constant velocity. Kept for consistency with other
+                velocity methods.
+            dz (float): The sample interval of the input data.
+            dt (float): The sample interval of the converted data.
+        """
         # Find the nearest profile
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
-
         time = self.data[closest][:, 0]
         depth = self.data[closest][:, 0]
 
@@ -1081,7 +1126,6 @@ class SegyVelocityContainer(SegyContainer):
     def update(self, transect):
         super(SegyVelocityContainer, self).update(transect, flat=True)
 
-
     def depth2timept(self, d, point):
         """
         Converts a single sample from depth to time.
@@ -1092,25 +1136,20 @@ class SegyVelocityContainer(SegyContainer):
 
         returns: twt [s]
         """
-
-         # Find the nearest profile
+        # Find the nearest profile
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
+        profile = self.data[closest]
 
-        profile = self.data[idx]
-        
         # HACK TO MAKE FAKE VELOCITIES
         velocity = np.ones(profile.data.size) * 2000.0
 
         samp = profile.stats["sampling_rate"]
         z = np.arange(velocity.size) * 1.0 / samp
-        
         vrms = np.cumsum(velocity) / (np.arange(velocity.size)+1)
-
         vrms = np.interp(d, z, vrms)
-
         return 2.0*d/vrms
-    
+
     def time2depthpt(self, t, point):
         """
         Converts a single sample from depth to time.
@@ -1121,32 +1160,37 @@ class SegyVelocityContainer(SegyContainer):
 
         returns: depth [m]
         """
-
-         # Find the nearest profile
+        # Find the nearest profile
         coords = np.array(self.coords)
         closest = np.abs(coords - point).argmin()
+        profile = self.data[closest]
 
-        profile = self.data[idx]
-        
         # HACK TO MAKE FAKE VELOCITIES
         velocity = np.ones(profile.data.size) * 2000.0
 
         samp = profile.stats["sampling_rate"]
         t_profile = np.arange(velocity.size) * 1.0 / samp
-        
         vrms = np.cumsum(velocity) / (np.arange(velocity.size)+1)
-
         vrms = np.interp(t, t_profile, vrms)
-
-        
         return t*vrms/2.
-        
-    
-    def depth2time(self, trace, point, dz, dt):
 
+    def depth2time(self, trace, point, dz, dt):
+        """
+        Converts a data array in the depth domain to the time
+        domain.
+
+        Args:
+            data (array, 1d): A 1D numpy array.
+            point (float):  distance along transect corresponding to
+                the trace location. Not actually used, as this model
+                assumes a constant velocity. Kept for consistency with other
+                velocity methods.
+            dz (float): The sample interval of the input data.
+            dt (float): The sample interval of the converted
+                        data.
+        """
         distance = [(p - point)**2.0 for p in self.coords]
         idx = np.argmin(distance)
-
         profile = self.data[idx]
         seismic = np.array(trace)
 
@@ -1154,18 +1198,12 @@ class SegyVelocityContainer(SegyContainer):
         velocity = np.ones(profile.data.size) * 2000.0
 
         print idx+1, 'of', len(self.coords)
-
         samp = profile.stats["sampling_rate"]
         vel_z = np.arange(velocity.size) * 1.0 / samp
-
         z = np.arange(seismic.size)*dz
-
         velocity = np.interp(z, vel_z, velocity, velocity[0], velocity[-1])
-
         t = np.arange(self.range[0], self.range[1], dt)
-
         data = depth_to_time(seismic, velocity, z, t, mode="cubic")
-
         return data
 
     def time2depth(self, trace, point, dt, dz):
@@ -1179,7 +1217,6 @@ class SegyVelocityContainer(SegyContainer):
         """
         distance = [(p - point)**2.0 for p in self.coords]
         idx = np.argmin(distance)
-
         profile = self.data[idx]
         seismic = np.array(trace)
 
@@ -1189,13 +1226,8 @@ class SegyVelocityContainer(SegyContainer):
         print idx+1, 'of', len(self.coords)
         samp = profile.stats["sampling_rate"]
         vel_t = np.arange(velocity.size) * 1.0 / samp
-
         t = np.arange(seismic.size)*dt
-
         velocity = np.interp(t, vel_t, velocity, velocity[0], velocity[-1])
-
         z = np.arange(self.range[0], self.range[1], dz)
-
         data = time_to_depth(seismic, velocity, t, z, mode="cubic")
-
         return data
