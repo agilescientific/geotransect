@@ -1,8 +1,9 @@
-<<<<<<< HEAD
 data
-=======
+notebooks
 .DS_Store
 *.pyc
 .ipynb*
+*.png
+*.svg
+*.old
 
->>>>>>> fa6883b82c4d9e060f6513cf02dcc769b29f0d6d

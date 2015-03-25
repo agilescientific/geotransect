@@ -47,6 +47,9 @@ class BaseContainer(object):
     Holds some basic information that we want in every object. Does not
     contain any data or pointers, only the transect parameters. Maybe
     eventually we can abstract some of the methods here too.
+
+    Args:
+        params (dict): The params you want to store. None are compulsory.
     """
     def __init__(self, params):
 
@@ -58,15 +61,28 @@ class BaseContainer(object):
 
         # The x extent will be updated at plot time.
         # TODO Make this less cryptic, or use two objects.
-        self.extents = [0, 0, self.range[1], self.range[0]]
+        rng = getattr(self, 'range', None)
+        if rng:
+            self.extents = [0, 0, self.range[1], self.range[0]]
 
     def reset_data(self):
+        """
+        Set some basic objects to empty placeholders.
+
+        No args, no return. Side-effect: sets attributes.
+        """
         self.data = []
         self.coords = []
         if isinstance(self, LogContainer):
             self.log_lookup = {}
 
     def reset_all(self):
+        """
+        Called at the start of an update. Just to make
+        sure everything is empty.
+
+        No args, no return. Side-effect: sets attributes.
+        """
         self.reset_data()
         self.lookup = {}
 

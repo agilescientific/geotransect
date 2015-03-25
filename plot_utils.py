@@ -27,7 +27,7 @@ def plot_line(m, line, colour='b', lw=1, alpha=1):
         colour (str): A colour from the matplotlib dictionary.
 
     Returns:
-        List: A list of matplotlib lines.
+        list: A list of matplotlib lines.
     """
     lo, la = line.xy
     x, y = m(lo, la)
@@ -55,7 +55,7 @@ def plot_point(m, point, colour='b', shape='o', alpha=1, zorder=None):
         colour (str): A colour from the matplotlib dictionary.
 
     Returns:
-        List: A list of matplotlib points.
+        list: A list of matplotlib points.
     """
     lo, la = point.xy
     x, y = m(lo, la)
@@ -72,9 +72,12 @@ def draw_basemap(m, tc):
 
     Args:
         m (Basemap): A matplotlib Basemap.
+        tc (TransectContainer): We need the map edges from the
+            active container. Ideally we'd get them out of the 
+            Basemap object, but I can't see how to do this.
 
     Returns:
-        m (Basemap): The newly decorated Basemap.
+        Basemap: The newly decorated Basemap.
     """
     m.drawmapboundary(fill_color='#ccddee')
     m.drawcoastlines(color='#9caf9c')
