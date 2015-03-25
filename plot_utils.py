@@ -73,16 +73,16 @@ def draw_basemap(m, tc):
     Args:
         m (Basemap): A matplotlib Basemap.
         tc (TransectContainer): We need the map edges from the
-            active container. Ideally we'd get them out of the 
+            active container. Ideally we'd get them out of the
             Basemap object, but I can't see how to do this.
 
     Returns:
         Basemap: The newly decorated Basemap.
     """
-    m.drawmapboundary(fill_color='#ccddee')
-    m.drawcoastlines(color='#9caf9c')
+    m.drawmapboundary(fill_color='#ddf5fb')
+    m.drawcoastlines(color='#afd1e4')
     m.drawcountries()
-    m.fillcontinents(color='#d8e3d8', lake_color='#ccddee')
+    m.fillcontinents(color='#d6e5d6', lake_color='#ddf5fb')
     m.drawmeridians(np.arange(0, 360, 0.5),
                     color='gray',
                     labels=[False, False, True, False])

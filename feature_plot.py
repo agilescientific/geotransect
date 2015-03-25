@@ -15,6 +15,7 @@ import matplotlib.transforms as transforms
 from striplog import Legend
 
 import utils
+from notice import Notice
 
 
 def get_curve_params(abbrev, fname):
@@ -57,13 +58,15 @@ def plot_feature_well(tc, gs):
         tc (TransectContainer): The container for the main plot.
         log (axis): A matplotlib axis.
         gs (GridSpec): A matplotlib gridspec.
-    Note:
-        Use with care! This is not a standalone plotting function. It was
-        removed from main plotting method for readability and ease of use.
     """
     fname = tc.settings['curve_display']
 
     logs = tc.log.get(tc.feature_well)
+
+    if not logs:
+        # There was no data for this well, so there won't be a feature plot.
+        Notice.fail("There's no well data for feature well " + tc.feature_well)
+        return gs
 
     Z = logs.data['DEPT']
 
@@ -75,7 +78,7 @@ def plot_feature_well(tc, gs):
               'RHOB',
               'DRHO']
 
-    window = 51    # window length for smoothing must be an odd integer
+    window = tc.settings.get('curve_smooth_window') or 51
     ntracks = 5
     lw = 1.0
     smooth = True
@@ -90,11 +93,6 @@ def plot_feature_well(tc, gs):
         params = get_curve_params(curve, fname)
         ncurv_per_track[params['track']] += 1
 
-    # Would like feature plot to have different wspace, but this adjusts all.
-    # gs.update(wspace=0)
-
-    # To add a footer, add -1 after the colons, eg gs[2:-1,...]
-
     axss = plt.subplot(gs[2:, -5])
     axs0 = [axss, axss.twiny()]
     axs1 = [plt.subplot(gs[2:, -4])]
@@ -106,7 +104,12 @@ def plot_feature_well(tc, gs):
 
     if getattr(tc.log, 'striplog', None):
         legend = Legend.default()
-        logs.striplog[tc.log.striplog].plot_axis(axs0[0], legend=legend)
+        try:
+            logs.striplog[tc.log.striplog].plot_axis(axs0[0], legend=legend)
+        except KeyError:
+            # In fact, this striplog doesn't exist.
+            Notice.fail("There is no such striplog" + tc.log.striplog)
+            # And move on...
 
     axs0[0].set_ylim([Z[-1], 0])
     label_shift = np.zeros(len(axs))
@@ -115,7 +118,7 @@ def plot_feature_well(tc, gs):
         try:
             values = logs.data[curve]
         except ValueError:
-            print "Curve not present:", curve
+            Notice.warning("Curve not present: "+curve)
             values = np.empty_like(Z)
             values[:] = np.nan
 
@@ -157,7 +160,7 @@ def plot_feature_well(tc, gs):
             try:
                 nphi = utils.rolling_median(logs.data['NPHI_SAN'], window)
             except ValueError:
-                print "No NPHI in this well"
+                Notice.warning("No NPHI in this well")
                 nphi = np.empty_like(Z)
                 nphi[:] = np.nan
             axs[i][j].fill_betweenx(Z,
@@ -254,7 +257,7 @@ def plot_feature_well(tc, gs):
     # ------------------------------------------------- #
 
     # Add Depth label
-    axs[0][0].text(0, 1.05, 'MD m', fontsize='10',
+    axs[0][0].text(0, 1.05, 'MD\n$m$', fontsize='10',
                    horizontalalignment='center',
                    verticalalignment='center',
                    transform=axs[0][0].transAxes)
@@ -270,6 +273,7 @@ def plot_feature_well(tc, gs):
         label.set_rotation(90)
         label.set_fontsize(10)
 
+    # Add Tops
     try:
         if os.path.exists(tc.tops_file):
             tops = utils.get_tops(tc.tops_file)
@@ -302,6 +306,9 @@ def plot_feature_well(tc, gs):
                                      weight='light')
 
     except AttributeError:
-        print "No tops for this well."
+        Notice.warning("No tops for this well")
+    except TypeError:
+        # We didn't get a tops file so move along.
+        print "No tops for this well"
 
     return gs

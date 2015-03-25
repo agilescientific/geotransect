@@ -89,6 +89,8 @@ def complete_paths(dictionary, root):
     for k, v in dictionary.items():
         # This feels unpythonic, but it's the best I can come up with.
         # See discussion http://stackoverflow.com/questions/9168904/
+        if not v:
+            continue
         if isinstance(v, basestring):
             dictionary[k] = os.path.join(root, v)
         else:

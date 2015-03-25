@@ -86,7 +86,7 @@ im = ax.imshow(data, cmap=cm.gray, origin='upper',
                        line_extents['last_trace'],
                        line_extents['end_time'],
                        line_extents['start_time']),
-               aspect = aspect*0.5
+               aspect = aspect * 0.5
                )
 ax.set_ylabel('Two-way time [ms]')
 ax.set_xlabel('Trace no.')

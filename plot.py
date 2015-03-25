@@ -16,12 +16,12 @@ from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import hsv_to_rgb
 import matplotlib.transforms as transforms
 from matplotlib import gridspec
-from matplotlib.ticker import ScalarFormatter
 
 from autowrap import on_draw
 import utils
 from feature_plot import plot_feature_well
 from plot_utils import *
+from notice import Notice
 
 
 def plot(tc):
@@ -36,10 +36,15 @@ def plot(tc):
     fw = 5   # width of the feature plot (inches) must be div by 5
     n_grids = len(tc.potfield.data)
 
+    # We will save the same figure we make, to ensure the saved figure
+    # has everything in the right places. For example, see this discussion:
+    # http://stackoverflow.com/questions/7906365/
+    save_dpi = getattr(tc, 'save_dpi', tc.settings.get('default_dpi'))
+    dpi = save_dpi or 80
     fig = plt.figure(figsize=(mw + fw + 1, 15),
                      facecolor='w',
                      edgecolor='k',
-                     dpi=None,
+                     dpi=dpi,
                      frameon=True)
 
     gs = gridspec.GridSpec(h, mw + fw + 1)
@@ -56,9 +61,8 @@ def plot(tc):
     # Right-hand column.
     log_header = fig.add_subplot(gs[0:1, -1*fw:])
     # log_plot is dealt with by passing gs to feature_plot.plot_feature_well()
-    #logo = fig.add_subplot(gs[-1:, -1*fw:])
 
-    # Adjust white space between subplots (maybe put in function?)
+    # Adjust white space between subplots
     # ------------------------------------------------------------ #
     left = 0.05     # left side of the subplots of the figure
     right = 0.95    # right side of the subplots of the figure
@@ -91,26 +95,45 @@ def plot(tc):
                    linewidth=1.5,
                    color='k')
 
-    # Meta description
+    # Subtitle
     header.text(1.0, 0.5 + dy,
                 (tc.subtitle),
-                fontsize=14,
+                fontsize=15,
                 horizontalalignment='right',
                 verticalalignment='bottom', weight='bold')
 
-    # Wrap text
-    fig.canvas.mpl_connect('draw_event', lambda event: on_draw(event))
+    descr = tc.description
+    if tc.meta:
+        description.text(0, 1.0,
+                         tc.domain.upper(),
+                         horizontalalignment='left',
+                         verticalalignment='bottom',
+                         fontsize=14
+                         )
+
+        description.text(1.0, 1.0,
+                         tc.velocity,
+                         horizontalalignment='right',
+                         verticalalignment='bottom',
+                         fontsize=12
+                         )
+        descr_pos = 0.8  # Where to position the rest.
+    else:
+        descr_pos = 1.0
 
     # Paragraph description
     # -----------------------------------------------------#
-    description.text(0, 1.0,
-                     tc.description,
+    description.text(0, descr_pos,
+                     descr,
                      horizontalalignment='left',
                      verticalalignment='top',
-                     fontsize=12
+                     fontsize=12, family='serif'
                      )
 
     description.axis('off')
+
+    # Wrap text
+    fig.canvas.mpl_connect('draw_event', lambda event: on_draw(event, description))
 
     # Map
     # ---------------------------------------------------------#
@@ -209,11 +232,13 @@ def plot(tc):
     elevation.text(0.01, 0.8,
                    "Elevation",
                    props, va='bottom',
-                   fontsize=10, transform=elevation.transAxes)
+                   fontsize=11, weight='bold',
+                   transform=elevation.transAxes)
     elevation.text(0.01, 0.75,
                    "Surface geology",
                    props, va='top',
-                   fontsize=10, transform=elevation.transAxes)
+                   fontsize=10,
+                   transform=elevation.transAxes)
     elevation.set_frame_on(False)
     for tick in elevation.get_xaxis().get_major_ticks():
         tick.set_pad(-8.)
@@ -274,6 +299,13 @@ def plot(tc):
                      ha='center', va='center', fontsize=16)
     colorbar_ax.set_axis_off()
 
+    # Title
+    xsection.text(0.01, 0.99,
+                  "Seismic",
+                  color='k',
+                  ha='left', va='top',
+                  fontsize=12, weight='bold',
+                  transform=xsec_logs.transAxes)
     # Potential field data
     # -----------------------------------------------------------#
     print "Potfields"
@@ -283,7 +315,7 @@ def plot(tc):
         rect = [0, bot, 1, height]
         this_ax = add_subplot_axes(potfield, rect)
 
-        this_ax.scatter(payload['coords'],
+        sc = this_ax.scatter(payload['coords'],
                         payload['data'],
                         c=payload['colour'],
                         cmap=payload['cmap'],
@@ -299,11 +331,24 @@ def plot(tc):
         scale = payload['scale']
         if scale:
             this_ax.set_ylim(float(scale[1]), float(scale[0]))
-        #ymax = this_ax.get_ylim()[1]
-        this_ax.text(0.01, 1.0, field,
-                     va='top',
-                     fontsize=10,
-                     color='k', transform=this_ax.transAxes)
+
+        if payload['colour_is_file']:
+            tcol = '#555555'
+        else:
+            tcol = payload['colour']
+
+        this_ax.text(0.01, 0.01, field,
+                     ha='left', va='bottom',
+                     fontsize=10, color=tcol,
+                     transform=this_ax.transAxes)
+
+        # potfield colorbar
+        # TODO: This doesn't work.
+        if payload.get('cmap'):
+            # pf_cbar_ax = add_subplot_axes(this_ax, [0.975, 0.1, 0.01, 0.8])
+            # fig.colorbar(sc, cax=pf_cbar_ax)
+            # pf_cbar_ax.set_axis_off()
+            pass
 
     potfield.axis(plot_axis)
     potfield.set_frame_on(False)
@@ -312,6 +357,10 @@ def plot(tc):
     potfield.tick_params(axis='x', which='major', labelsize=10)
     potfield.set_xlabel("Transect range [km]", fontsize=10, ha='center')
 
+    potfield.text(0.01, 1.0, "Potential fields",
+                  ha='left', va='top',
+                  fontsize=11, weight='bold', color='k',
+                  transform=potfield.transAxes)
     # Log overlays
     # --------------------------------------------------------#
     print "Logs"
@@ -323,8 +372,8 @@ def plot(tc):
             if not well_colour:
                 well_colour = 'k'
 
+    c = tc.seismic_log_colour
     for name, las, pos in zip(tc.log.names, tc.log.data, tc.log.coords):
-        c = tc.seismic_log_colour
 
         if name == tc.feature_well:
             alpha, lw = 0.5, 1.5
@@ -339,7 +388,6 @@ def plot(tc):
             z = las.data['DEPT']
 
             if tc.domain.lower() in ['time', 'twt', 'twtt', 't']:
-                print "Time-converting section well", name
                 dt = 0.001
                 data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
                 start = tc.seismic.velocity.depth2timept(las.start, pos)
@@ -379,16 +427,17 @@ def plot(tc):
                        weight=weight)
 
     # Log type annotation, top left
-    xsec_logs.text(0.01, 0.99,
+    xsec_logs.text(0.01, 0.965,
                    tc.seismic_log+' log',
                    color=c,
-                   va='top',
-                   fontsize=12, transform=xsec_logs.transAxes)
+                   ha='left', va='top',
+                   fontsize=12,
+                   transform=xsec_logs.transAxes)
 
     #  Feature plot
     # -----------------------------------------------------#
-    print "Feature plot"
     if tc.feature_well:
+        print "Feature well:", tc.feature_well
         log_header.text(0.0, 1.0,
                         ("Well " + tc.feature_well),
                         verticalalignment='top',
@@ -404,9 +453,11 @@ def plot(tc):
                            linewidth=1,
                            color='k')
 
-        log_header.axis("off")
-
         plot_feature_well(tc, gs)
+    else:
+        Notice.warning("No feature well")
+
+    log_header.axis("off")
 
     # Logo etc.
     # --------------------------------------------------------------#
@@ -415,7 +466,7 @@ def plot(tc):
     try:
         path = os.path.join(tc.data_dir, tc.settings['logo_file'])
         im = Image.open(path)
-        im.thumbnail((90, 90), Image.ANTIALIAS)
+        im.thumbnail((fig.dpi, fig.dpi), Image.ANTIALIAS)
     except IOError:
         print "Image is missing", path
         im = np.zeros((1, 1, 3))
@@ -446,8 +497,15 @@ def plot(tc):
     # --------------------------------------------------------------#
     save_file = getattr(tc, 'save_file', None)
     if save_file:
-        print "Saving file", save_file
-        plt.savefig(save_file)
+        if type(save_file) != 'str':
+            # Then it's probably a bool from 'yes' or 'true' in the config
+            save_file = tc.config_file.split('.')[0] + '.png'
+            if save_file == 'config.png':
+                save_file = 'temp.png'
+        Notice.ok("Saving file "+save_file+"...", hold=True)
+        plt.savefig(save_file, dpi=fig.dpi)
+        Notice.ok("Done")
+        Notice.warning("The displayed image is not identical to the saved one")
+        plt.show()
     else:
-        plt.savefig("test.png")
         plt.show()

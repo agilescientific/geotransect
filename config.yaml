@@ -11,6 +11,7 @@ params:
 
     # The description is a long piece of free text describing the transect.
     description: Transect used for testing geotransect.
+    meta: on                  # Whether to print more info in the header.
     domain: time              # Time or depth.
     range:                    # The vertical range of the cross-section view.
         - 0                   # The top, in ms or m.

@@ -2,6 +2,7 @@ data
 notebooks
 .DS_Store
 .ipynb*
+t*.yaml
 *.png
 *.svg
 

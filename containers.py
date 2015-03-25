@@ -124,7 +124,7 @@ class TransectContainer(BaseContainer):
                 if line['properties']['id'] == self.id:
                     self.data = shape(line['geometry'])
         if not self.data:
-            print "No transect with ID", self.id
+            Notice.fail("No transect with ID "+self.id)
 
         # self.data.length holds the length of the transect in metres
         # But often we want ints, and sometimes the number of samples.
@@ -464,8 +464,9 @@ class SegyContainer(BaseContainer):
                 file_lookup[f]["point"] = [point]
 
         # Read in the chunks from the segy file
+        self.files = []
         for segyfile in file_lookup.keys():
-            print os.path.basename(segyfile)
+            self.files.append(os.path.basename(segyfile))
             segy = readSEGY(segyfile, unpack_trace_headers=True)
             traces = file_lookup[segyfile]["trace"]
             coords = file_lookup[segyfile]["pos"]
@@ -519,7 +520,7 @@ class SeismicContainer(SegyContainer):
 
         data = []
         # Loop through files
-        for segydata, coords in zip(self.data, self.coords):
+        for name, segydata, coords in zip(self.files, self.data, self.coords):
             # Through traces
             traces = []
             for trace, coord in zip(segydata, coords):
@@ -535,6 +536,12 @@ class SeismicContainer(SegyContainer):
                 else:
                     traces.append(trace.data)
                     samp /= 1000.0
+
+            print name,
+            if traces:
+                print len(traces), "traces"
+            else:
+                print ""
 
             struct = {"sample_interval": 1.0/samp,
                       "traces": np.transpose(np.array(traces))}
@@ -591,7 +598,7 @@ class HorizonContainer(BaseContainer):
         """
         Notice.info("Updating " + self.__class__.__name__)
 
-        b = self.settings['fine_buffer']
+        b = self.settings.get('fine_buffer') or self.settings['buffer']
         prepared = prep(transect.buffer(b))
 
         for horizon, points in self.lookup.items():
@@ -788,7 +795,7 @@ class LogContainer(BaseContainer):
             self.names.append(name)
             print name,
 
-            pattern = "^" + name + ".*out.las"
+            pattern = "^" + name + "_out.las"
             for fname in utils.walk(self.well_dir, pattern):
                 # This is a loop but there should only be one matching file.
                 well = Well(fname, null_subs=np.nan)
@@ -821,16 +828,6 @@ class LogContainer(BaseContainer):
         """
         return self.log_lookup.get(log_id)
 
-    # def get_point(self, log_id):
-    #     ids = self.lookup.values()
-    #     points = self.lookup.keys()
-    #     index = ids.index(log_id)
-
-    #     if index:
-    #         return points[index]
-    #     else:
-    #         return None
-
 
 class VelocityError(Exception):
     """
@@ -847,6 +844,12 @@ class ConstantVelocityContainer(BaseContainer):
     def __init__(self, velocity, params):
         super(ConstantVelocityContainer, self).__init__(params)
         self.velocity = velocity
+
+    def __str__(self):
+        """
+        Needed for adding metadata to 'description'.
+        """
+        return "Constant velocity, {} m/s".format(self.velocity)
 
     def update(self, transect):
         """
@@ -938,9 +941,11 @@ class SimpleVelocityContainer(BaseContainer):
         # Initialize the base class
         super(SimpleVelocityContainer, self).__init__(params)
 
+        self.vel_dir = vel_dir  # used by __str__
         self.profiles = {}
+        count = 0
         for profile in fnmatch.filter(os.listdir(vel_dir), '*.txt'):
-
+            count += 1
             with open(os.path.join(vel_dir, profile), 'r') as f:
 
                 # Read the location out of the file
@@ -980,6 +985,19 @@ class SimpleVelocityContainer(BaseContainer):
                         continue
 
                     self.profiles[loc].append([float(time), float(depth)])
+        self.count = count
+
+    def __str__(self):
+        """
+        Needed for adding metadata to 'description'.
+        """
+        vel_dir = os.path.split(self.vel_dir)[1]
+        string = "Simple velocity model, {} file{} in {}"
+        if self.count == 1:
+            s = ''
+        else:
+            s = 's'
+        return string.format(self.count, s, vel_dir)
 
     def update(self, transect):
         """
@@ -1102,7 +1120,6 @@ class SimpleVelocityContainer(BaseContainer):
 
         time[0] = time[1]  # divide by zero hack
         vavg = depth / time
-        print "vavg", vavg[:5], vavg[-5:]
 
         # Get an actual interval
         if np.size(dz) > 1:
@@ -1110,17 +1127,10 @@ class SimpleVelocityContainer(BaseContainer):
 
         # resample vavg to match the data
         input_depth = np.arange(data.size) * dz
-        print "dz...", dz
-        print "input_depth", input_depth[:5], input_depth[-5:]
-
         vavg = np.interp(input_depth, depth, vavg, vavg[0], vavg[1])
-        print "vavg now", vavg[:5], vavg[-5:]
 
         # calculate the linear z axis
         t_in = input_depth / vavg
-        print "len tin", len(t_in)
-        print "t_in...", t_in[0], t_in[1:5], t_in[-1]
-        print "dt.....", dt
         t_out = np.arange(t_in[0], t_in[-1], dt)
 
         # do the conversion
@@ -1136,8 +1146,20 @@ class SegyVelocityContainer(SegyContainer):
 
     def __init__(self, vel_dir, params):
         super(SegyVelocityContainer, self).__init__(vel_dir, params)
+        self.vel_dir = vel_dir  # used by __str__
+
+    def __str__(self):
+        """
+        Needed for adding metadata to 'description'.
+        """
+        vel_dir = os.path.split(self.vel_dir)[1]
+        string = "SEGY velocity model, from data in {}"
+        return string.format(vel_dir)
 
     def update(self, transect):
+        """
+        Updates are done by the superclass.
+        """
         super(SegyVelocityContainer, self).update(transect, flat=True)
 
     def depth2timept(self, d, point):
@@ -1211,7 +1233,6 @@ class SegyVelocityContainer(SegyContainer):
         # HACK TO MAKE FAKE VELOCITIES
         velocity = np.ones(profile.data.size) * 2000.0
 
-        print idx+1, 'of', len(self.coords)
         samp = profile.stats["sampling_rate"]
         vel_z = np.arange(velocity.size) * 1.0 / samp
         z = np.arange(seismic.size)*dz
@@ -1237,7 +1258,6 @@ class SegyVelocityContainer(SegyContainer):
         # HACK TO MAKE FAKE VELOCITIES
         velocity = np.ones(profile.data.size) * 2000.0
 
-        print idx+1, 'of', len(self.coords)
         samp = profile.stats["sampling_rate"]
         vel_t = np.arange(velocity.size) * 1.0 / samp
         t = np.arange(seismic.size)*dt

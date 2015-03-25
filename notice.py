@@ -21,8 +21,12 @@ class Notice(object):
               }
     ENDC = '\033[0m'
 
-    def __init__(self, string, style):
-        print self.styles[style.upper()] + string + self.ENDC
+    def __init__(self, string, style, hold=False):
+        string = self.styles[style.upper()] + string + self.ENDC
+        if hold:
+            print string,
+        else:
+            print string
 
     @classmethod
     def title(cls):
@@ -40,27 +44,32 @@ class Notice(object):
         return cls(logo, 'WARNING')
 
     @classmethod
-    def warning(cls, string):
+    def warning(cls, string, hold=False):
+        """Yellow."""
+        return cls(string, 'WARNING', hold=hold)
+
+    @classmethod
+    def fail(cls, string, hold=False):
         """Red."""
-        return cls(string, 'WARNING')
+        return cls(string, 'FAIL', hold=hold)
 
     @classmethod
-    def header(cls, string):
+    def header(cls, string, hold=False):
         """Pink."""
-        return cls('\n'+string+'\n', 'HEADER')
+        return cls('\n'+string+'\n', 'HEADER', hold=hold)
 
     @classmethod
-    def hr_header(cls, string):
+    def hr_header(cls, string, hold=False):
         """Pink."""
         hr = "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-        return cls(hr+string.upper(), 'HEADER')
+        return cls(hr+string.upper(), 'HEADER', hold=hold)
 
     @classmethod
-    def info(cls, string):
+    def info(cls, string, hold=False):
         """Blue."""
-        return cls('\n'+string, 'INFO')
+        return cls('\n'+string, 'INFO', hold=hold)
 
     @classmethod
-    def ok(cls, string):
+    def ok(cls, string, hold=False):
         """Green."""
-        return cls(string, 'OK')
+        return cls(string, 'OK', hold=hold)
