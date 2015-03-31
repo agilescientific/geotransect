@@ -39,6 +39,9 @@
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
           <a href="plot.html" title="Plot"
              accesskey="N">next</a> |</li>
         <li class="right" >
@@ -53,8 +56,704 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="containers">
-<h1>Containers<a class="headerlink" href="#containers" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="module-containers">
+<span id="containers"></span><h1>Containers<a class="headerlink" href="#module-containers" title="Permalink to this headline">¶</a></h1>
+<p>Defines various data containers for plotting a transect.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">copyright:</th><td class="field-body">2015 Agile Geoscience</td>
+</tr>
+<tr class="field-even field"><th class="field-name">license:</th><td class="field-body">Apache 2.0</td>
+</tr>
+</tbody>
+</table>
+<dl class="class">
+<dt id="containers.BaseContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">BaseContainer</code><span class="sig-paren">(</span><em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.BaseContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Holds some basic information that we want in every object. Does not
+contain any data or pointers, only the transect parameters. Maybe
+eventually we can abstract some of the methods here too.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>params</strong> (<em>dict</em>) &#8211; The params you want to store. None are compulsory.</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="containers.BaseContainer.reset_all">
+<code class="descname">reset_all</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#containers.BaseContainer.reset_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called at the start of an update. Just to make
+sure everything is empty.</p>
+<p>No args, no return. Side-effect: sets attributes.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.BaseContainer.reset_data">
+<code class="descname">reset_data</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#containers.BaseContainer.reset_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set some basic objects to empty placeholders.</p>
+<p>No args, no return. Side-effect: sets attributes.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.BedrockContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">BedrockContainer</code><span class="sig-paren">(</span><em>bedrock_dir</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.BedrockContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains a geological map or similar basic geology shapes.</p>
+<dl class="method">
+<dt id="containers.BedrockContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.BedrockContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the container data to a profile that intersect the
+transect line.</p>
+<p>Returns nothing. Sets attributes as a side effect.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A transect line.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.ConstantVelocityContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">ConstantVelocityContainer</code><span class="sig-paren">(</span><em>velocity</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ConstantVelocityContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for handling constant velocity models</p>
+<dl class="method">
+<dt id="containers.ConstantVelocityContainer.__str__">
+<code class="descname">__str__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#containers.ConstantVelocityContainer.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Needed for adding metadata to &#8216;description&#8217;.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.ConstantVelocityContainer.depth2time">
+<code class="descname">depth2time</code><span class="sig-paren">(</span><em>data</em>, <em>point</em>, <em>dz</em>, <em>dt</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ConstantVelocityContainer.depth2time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a data array in the depth domain to the time
+domain.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> (<em>array, 1d</em>) &#8211; A 1D numpy array.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; distance along transect corresponding to
+the trace location. Not actually used, as this model
+assumes a constant velocity. Kept for consistency with other
+velocity methods.</li>
+<li><strong>dz</strong> (<em>float</em>) &#8211; The sample interval of the input data.</li>
+<li><strong>dt</strong> (<em>float</em>) &#8211; The sample interval of the converted
+data.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.ConstantVelocityContainer.depth2timept">
+<code class="descname">depth2timept</code><span class="sig-paren">(</span><em>d</em>, <em>point</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ConstantVelocityContainer.depth2timept" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a single sample from depth to time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>d</strong> (<em>float</em>) &#8211; Depth in metres.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; Range along transect in m. Not used
+here, only for consistent API.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">TWT [s]</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.ConstantVelocityContainer.time2depth">
+<code class="descname">time2depth</code><span class="sig-paren">(</span><em>data</em>, <em>point</em>, <em>dt</em>, <em>dz</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ConstantVelocityContainer.time2depth" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a data array from time to depth</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> (<em>array, 1d</em>) &#8211; A 1D numpy array.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; distance along transect corresponding to</li>
+<li><strong>trace location. Not actually used, as this model</strong> (<em>the</em>) &#8211; </li>
+<li><strong>a constant velocity</strong> (<em>assumes</em>) &#8211; </li>
+<li><strong>dt</strong> (<em>float</em>) &#8211; The sample interval of the input data.</li>
+<li><strong>dz</strong> (<em>float</em>) &#8211; The sample interval of the depth converted
+data.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.ConstantVelocityContainer.time2depthpt">
+<code class="descname">time2depthpt</code><span class="sig-paren">(</span><em>t</em>, <em>point</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ConstantVelocityContainer.time2depthpt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a single sample from time to depth.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t</strong> (<em>float</em>) &#8211; TWT in seconds.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; Range along transect. Not used
+here, only for consistent API.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Depth [m].</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.ConstantVelocityContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ConstantVelocityContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Does nothing, velocity is constant</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="containers.ContainerError">
+<em class="property">exception </em><code class="descclassname">containers.</code><code class="descname">ContainerError</code><a class="headerlink" href="#containers.ContainerError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generic error class</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.ElevationContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">ElevationContainer</code><span class="sig-paren">(</span><em>elevation_file</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ElevationContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Container for managing and plotting elevation data.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>elevation_file</strong> &#8211; Raster file containing the elevation
+profile of the area of interest.</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="containers.ElevationContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.ElevationContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the container data to a profile that intersect the
+transect line.</p>
+<p>Returns nothing. Sets attributes as a side effect.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A transect line.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.HorizonContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">HorizonContainer</code><span class="sig-paren">(</span><em>hor_dir</em>, <em>velocity</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.HorizonContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for reading and plotting seismic horizons.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>hor_dir</strong> (<em>str</em>) &#8211; Input directory containing seismic SEGY files.</li>
+<li><strong>velocity</strong> (<em>Object</em>) &#8211; A velocity container for time-depth
+conversion.</li>
+<li><strong>params</strong> (<em>dict</em>) &#8211; The parameters, as specified in the config.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="containers.HorizonContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.HorizonContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gather the data near the transect. Depth convert if necessary.</p>
+<p>Returns nothing. Side effect: sets attributes.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A shapely LineString object.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.LocmapContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">LocmapContainer</code><span class="sig-paren">(</span><em>layers</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.LocmapContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for building and plotting a location map.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>layers</strong> (<em>dict</em>) &#8211; The relative paths to files to use as layers.</li>
+<li><strong>params</strong> (<em>dict</em>) &#8211; The parameters, as specified in the config.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Example</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">layers</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;geology.tif&#39;</span><span class="p">,</span> <span class="s">&#39;roads.shp&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;domain&#39;</span><span class="p">:</span> <span class="s">&#39;depth&#39;</span><span class="p">,</span> <span class="s">&#39;buffer&#39;</span><span class="p">:</span> <span class="mi">300</span><span class="p">,</span> <span class="o">...</span> <span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mc</span> <span class="o">=</span> <span class="n">LocmapContainer</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="containers.LocmapContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.LocmapContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the container data to a profile that intersect the
+transect line.</p>
+<p>Returns nothing. Sets attributes as a side effect.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A transect line.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.LogContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">LogContainer</code><span class="sig-paren">(</span><em>well_dir</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.LogContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Container for managing and plotting LAS data.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>well_dir</strong> (<em>str</em>) &#8211; Directory shape files of LAS headers.</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Example</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">well_dir</span> <span class="o">=</span> <span class="s">&#39;wells/logs/&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;domain&#39;</span><span class="p">:</span> <span class="s">&#39;depth&#39;</span><span class="p">,</span> <span class="s">&#39;buffer&#39;</span><span class="p">:</span> <span class="mi">300</span><span class="p">,</span> <span class="o">...</span> <span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">lc</span> <span class="o">=</span> <span class="n">LogContainer</span><span class="p">(</span><span class="n">well_dir</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="containers.LogContainer.get">
+<code class="descname">get</code><span class="sig-paren">(</span><em>log_id</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.LogContainer.get" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns data corresponding to log_id.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.LogContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.LogContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the container data to a profile that intersect the
+transect line.</p>
+<p>Returns nothing. Sets attributes as a side effect.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A transect line.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.PotfieldContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">PotfieldContainer</code><span class="sig-paren">(</span><em>potfields</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.PotfieldContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains potential field data.</p>
+<dl class="method">
+<dt id="containers.PotfieldContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.PotfieldContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the container data to a profile that intersect the
+transect line.</p>
+<p>Returns nothing. Sets attributes as a side effect.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A transect line.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.SegyContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">SegyContainer</code><span class="sig-paren">(</span><em>segy_dir</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Superclass for handling Segy data.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>segy_dir</strong> (<em>str</em>) &#8211; Input directory containing Segy files.</li>
+<li><strong>params</strong> (<em>dict</em>) &#8211; The parameters, as specified in the config</li>
+<li><strong>Example</strong> &#8211; </li>
+<li><strong>seis_dir = 'seismic/segy_files/'</strong> (<em>&gt;&gt;&gt;</em>) &#8211; </li>
+<li><strong>params = {'domain'</strong> (<em>&gt;&gt;&gt;</em>) &#8211; &#8216;depth&#8217;, &#8216;buffer&#8217;: 300, ... }</li>
+<li><strong>segy = SegyContainer(seis_dir, params)</strong> (<em>&gt;&gt;&gt;</em>) &#8211; </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="containers.SegyContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em>, <em>flat=False</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the container data to a profile that intersect the
+transect line.</p>
+<p>Returns nothing. Sets attributes as a side effect.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>transect</strong> (<em>LineString</em>) &#8211; A transect line.</li>
+<li><strong>flat</strong> (<em>Bool</em>) &#8211; Reads data into a flat list instead of
+sorting by files.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.SegyVelocityContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">SegyVelocityContainer</code><span class="sig-paren">(</span><em>vel_dir</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyVelocityContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Container for managing velocity profiles.</p>
+<p>See SegyContainer.</p>
+<dl class="method">
+<dt id="containers.SegyVelocityContainer.__str__">
+<code class="descname">__str__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyVelocityContainer.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Needed for adding metadata to &#8216;description&#8217;.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SegyVelocityContainer.depth2time">
+<code class="descname">depth2time</code><span class="sig-paren">(</span><em>trace</em>, <em>point</em>, <em>dz</em>, <em>dt</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyVelocityContainer.depth2time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a data array in the depth domain to the time
+domain.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> (<em>array, 1d</em>) &#8211; A 1D numpy array.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; distance along transect corresponding to
+the trace location. Not actually used, as this model
+assumes a constant velocity. Kept for consistency with other
+velocity methods.</li>
+<li><strong>dz</strong> (<em>float</em>) &#8211; The sample interval of the input data.</li>
+<li><strong>dt</strong> (<em>float</em>) &#8211; The sample interval of the converted
+data.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SegyVelocityContainer.depth2timept">
+<code class="descname">depth2timept</code><span class="sig-paren">(</span><em>d</em>, <em>point</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyVelocityContainer.depth2timept" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a single sample from depth to time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>d</strong> (<em>float</em>) &#8211; depth in meters</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; range along transect</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>returns: twt [s]</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SegyVelocityContainer.time2depth">
+<code class="descname">time2depth</code><span class="sig-paren">(</span><em>trace</em>, <em>point</em>, <em>dt</em>, <em>dz</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyVelocityContainer.time2depth" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a seismic trace from time to depth.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>trace</strong> (<em>array, 1d</em>) &#8211; A 1D numpy array.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; distance along transect corresponding to
+the trace location.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SegyVelocityContainer.time2depthpt">
+<code class="descname">time2depthpt</code><span class="sig-paren">(</span><em>t</em>, <em>point</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyVelocityContainer.time2depthpt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a single sample from depth to time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>t</strong> (<em>float</em>) &#8211; time in [s]</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; range along transect</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>returns: depth [m]</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SegyVelocityContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SegyVelocityContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates are done by the superclass.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.SeismicContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">SeismicContainer</code><span class="sig-paren">(</span><em>seis_dir</em>, <em>velocity</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SeismicContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for reading and plotting seismic data.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>seis_dir</strong> (<em>str</em>) &#8211; Input directory containing seismic SEGY files.</li>
+<li><strong>params</strong> (<em>dict</em>) &#8211; The parameters, as specified in the config.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Example</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">seis_dir</span> <span class="o">=</span> <span class="s">&#39;seismic/segy_files/&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;domain&#39;</span><span class="p">:</span> <span class="s">&#39;depth&#39;</span><span class="p">,</span> <span class="s">&#39;buffer&#39;</span><span class="p">:</span> <span class="mi">300</span><span class="p">,</span> <span class="o">...</span> <span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">seis</span> <span class="o">=</span> <span class="n">seismicContainer</span><span class="p">(</span><span class="n">seis_dir</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="containers.SeismicContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SeismicContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gather the data near the transect. Depth convert if necessary.</p>
+<p>Returns nothing. Side effect: sets attributes.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A shapely LineString object.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.SimpleVelocityContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">SimpleVelocityContainer</code><span class="sig-paren">(</span><em>vel_dir</em>, <em>params</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SimpleVelocityContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for handling simple velocity profiles read from text
+files. Simple example below, # are not parsed and are used as
+comments.</p>
+<p>coordinates, 150,20.25</p>
+<p># time [s], depth [m]
+0, 0
+1000, 1000
+2000, 2000
+3000, 3000</p>
+<dl class="method">
+<dt id="containers.SimpleVelocityContainer.__str__">
+<code class="descname">__str__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#containers.SimpleVelocityContainer.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Needed for adding metadata to &#8216;description&#8217;.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SimpleVelocityContainer.depth2time">
+<code class="descname">depth2time</code><span class="sig-paren">(</span><em>data</em>, <em>point</em>, <em>dz</em>, <em>dt</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SimpleVelocityContainer.depth2time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a data array in the depth domain to the time
+domain.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> (<em>array, 1d</em>) &#8211; A 1D numpy array.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; distance along transect corresponding to
+the trace location. Not actually used, as this model
+assumes a constant velocity. Kept for consistency with other
+velocity methods.</li>
+<li><strong>dz</strong> (<em>float</em>) &#8211; The sample interval of the input data.</li>
+<li><strong>dt</strong> (<em>float</em>) &#8211; The sample interval of the converted data.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SimpleVelocityContainer.depth2timept">
+<code class="descname">depth2timept</code><span class="sig-paren">(</span><em>d</em>, <em>point</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SimpleVelocityContainer.depth2timept" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a single sample from depth to time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>d</strong> (<em>float</em>) &#8211; depth in meters</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; range along transect</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>returns: twt [s]</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SimpleVelocityContainer.time2depth">
+<code class="descname">time2depth</code><span class="sig-paren">(</span><em>data</em>, <em>point</em>, <em>dt</em>, <em>dz</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SimpleVelocityContainer.time2depth" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a data array from time to depth</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> (<em>array, 1d</em>) &#8211; A 1D numpy array.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; distance along transect corresponding to</li>
+<li><strong>trace location. Not actually used, as this model</strong> (<em>the</em>) &#8211; </li>
+<li><strong>a constant velocity</strong> (<em>assumes</em>) &#8211; </li>
+<li><strong>dt</strong> (<em>float</em>) &#8211; The sample interval of the input data.</li>
+<li><strong>dz</strong> (<em>float</em>) &#8211; The sample interval of the depth converted
+data.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SimpleVelocityContainer.time2depthpt">
+<code class="descname">time2depthpt</code><span class="sig-paren">(</span><em>t</em>, <em>point</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SimpleVelocityContainer.time2depthpt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a single sample from time to depth.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>t</strong> (<em>float</em>) &#8211; TWT in seconds.</li>
+<li><strong>point</strong> (<em>float</em>) &#8211; Range along transect [m].</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Depth in m.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="containers.SimpleVelocityContainer.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>transect</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.SimpleVelocityContainer.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gather the data near the transect. Depth convert if necessary.</p>
+<p>Returns nothing. Side effect: sets attributes.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>transect</strong> (<em>LineString</em>) &#8211; A shapely LineString object.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="containers.TransectContainer">
+<em class="property">class </em><code class="descclassname">containers.</code><code class="descname">TransectContainer</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#containers.TransectContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Main driver class for generating transect plots. Builds and
+accesses all other plot containers</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>params</strong> (<em>dict</em>) &#8211; Directory containing shape files of the transects.</li>
+<li><strong>data</strong> (<em>dict</em>) &#8211; Contains the shape files for the various sub-containers.</li>
+<li><strong>layers</strong> (<em>dict</em>) &#8211; Contains the shape files for the map.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="containers.TransectContainer.plot">
+<code class="descname">plot</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#containers.TransectContainer.plot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates plot for the transect.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="containers.VelocityError">
+<em class="property">exception </em><code class="descclassname">containers.</code><code class="descname">VelocityError</code><a class="headerlink" href="#containers.VelocityError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gerneric error class.</p>
+</dd></dl>
+
 </div>
 
 
@@ -97,8 +796,8 @@
       &copy;2015, Agile Geoscience.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3b3</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.1</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.3</a>
       
       |
       <a href="_sources/containers.txt"

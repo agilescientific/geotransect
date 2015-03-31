@@ -406,9 +406,6 @@ def plot(tc):
                               ymin=0,
                               ymax=z[-1])
             xsec_logs.plot(data, z, c, lw=0.5, alpha=0.75)
-            xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
-            xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
-            xsec_logs.axis("off")
         else:
             # Need to get TD from SHP or well header sheet.
             z = [tc.extents[2]-40]
@@ -425,6 +422,10 @@ def plot(tc):
                        ha='center',
                        fontsize=10,
                        weight=weight)
+
+    xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
+    xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
+    xsec_logs.axis("off")
 
     # Log type annotation, top left
     xsec_logs.text(0.01, 0.965,
