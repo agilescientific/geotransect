@@ -104,32 +104,35 @@ def add_subplot_axes(ax, rect, axisbg='w'):
     """
     Facilitates the addition of a small subplot within another plot.
 
-    From: http://stackoverflow.com/users/2309442/pablo
+    From: http://stackoverflow.com/questions/17458580/
+    embedding-small-plots-inside-subplots-in-matplotlib
+
     License: CC-BY-SA
 
     Args:
         ax (axis): A matplotlib axis.
-        rect (list): A rect specifying [left pos, bottom pos, with, height]
-
+        rect (list): A rect specifying [left pos, bot pos, width, height]
     Returns:
         axis: The sub-axis in the specified position.
     """
+    def axis_to_fig(axis):
+        fig = axis.figure
+
+        def transform(coord):
+            return fig.transFigure.inverted().transform(
+                axis.transAxes.transform(coord))
+        return transform
+
     fig = plt.gcf()
-    box = ax.get_position()
-    width = box.width
-    height = box.height
-    inax_position = ax.transAxes.transform(rect[0:2])
-    transFigure = fig.transFigure.inverted()
-    infig_position = transFigure.transform(inax_position)
-    x = infig_position[0]
-    y = infig_position[1]
-    width *= rect[2]
-    height *= rect[3]  # <= Typo was here
-    subax = fig.add_axes([x, y, width, height], axisbg=axisbg)
+    left, bottom, width, height = rect
+    trans = axis_to_fig(ax)
+    x1, y1 = trans((left, bottom))
+    x2, y2 = trans((left + width, bottom + height))
+    subax = fig.add_axes([x1, y1, x2 - x1, y2 - y1])
     x_labelsize = subax.get_xticklabels()[0].get_size()
     y_labelsize = subax.get_yticklabels()[0].get_size()
-    x_labelsize *= rect[2]**0.5
-    y_labelsize *= rect[3]**0.5
+    x_labelsize *= rect[2] ** 0.5
+    y_labelsize *= rect[3] ** 0.5
     subax.xaxis.set_tick_params(labelsize=x_labelsize)
     subax.yaxis.set_tick_params(labelsize=y_labelsize)
     return subax

@@ -58,7 +58,7 @@ data:
 #  - SEGY, with data 'str' for a directory containing SEGY files.
 velocity:
     type: constant
-    data: 2500
+    data: 4200
 
 # You can specify any number of potential fields, or potfields, to display
 # beneath the seismic section. More than 4 will likely get quite crowded.

@@ -41,7 +41,7 @@ class ShapeFileExists(Exception):
     """
     Generic error class.
     """
-    pass
+    print 'exists'  # used to be a pass
 
 
 def sgy2shp(input_dir, output_dir, convert=False):
@@ -76,6 +76,7 @@ def sgy2shp(input_dir, output_dir, convert=False):
         for path in utils.walk(input_dir, "\\.se?gy$"):
 
             filebase = os.path.splitext(os.path.basename(path))[0]
+            print filebase
 
             # Read in the headers.
             segy = obspy.read(path,

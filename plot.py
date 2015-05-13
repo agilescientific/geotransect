@@ -213,8 +213,8 @@ def plot(tc):
                       color=color.flatten())
 
         elevation.plot(tc.elevation.coords[idx],
-                      tc.elevation.data[idx],
-                      lw=0.5, color='k')
+                       tc.elevation.data[idx],
+                       lw=0.5, color='k')
 
     max_height = np.amax(tc.elevation.all_data)
 
@@ -288,6 +288,7 @@ def plot(tc):
     xsection.set_frame_on(False)
 
     # Seismic colorbar
+    """
     colorbar_ax = add_subplot_axes(xsection, [0.975, 0.025, 0.01, 0.1])
     fig.colorbar(im, cax=colorbar_ax)
     colorbar_ax.text(0.5, 0.9, "+",
@@ -306,22 +307,22 @@ def plot(tc):
                   ha='left', va='top',
                   fontsize=12, weight='bold',
                   transform=xsec_logs.transAxes)
+    """
     # Potential field data
     # -----------------------------------------------------------#
     print "Potfields"
     for i, (field, payload) in enumerate(tc.potfield.data.items()):
-        bot = 1 - (i+1.)/n_grids
-        height = (1./n_grids) - 0.05
+        bot = 1 - (i + 1.) / n_grids
+        height = (1. / n_grids) - 0.05
         rect = [0, bot, 1, height]
         this_ax = add_subplot_axes(potfield, rect)
-
         sc = this_ax.scatter(payload['coords'],
-                        payload['data'],
-                        c=payload['colour'],
-                        cmap=payload['cmap'],
-                        s=1,
-                        edgecolor='',
-                        vmin=-50, vmax=150)
+                             payload['data'],
+                             c=payload['colour'],
+                             cmap=payload['cmap'],
+                             s=1,
+                             edgecolor='',
+                             vmin=-50, vmax=150)
 
         this_ax.set_xlim(tc.extents[:2])
         this_ax.set_frame_on(False)
@@ -361,6 +362,7 @@ def plot(tc):
                   ha='left', va='top',
                   fontsize=11, weight='bold', color='k',
                   transform=potfield.transAxes)
+
     # Log overlays
     # --------------------------------------------------------#
     print "Logs"
@@ -391,7 +393,7 @@ def plot(tc):
                 dt = 0.001
                 data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
                 start = tc.seismic.velocity.depth2timept(las.start, pos)
-                z = np.arange(0, len(data), 1) + 1000*start  # ms
+                z = np.arange(0, len(data), 1) + 1000 * start  # ms
 
             # Some post-processing for display
             lgsc = 0.015  # hack to compress the log width
@@ -408,7 +410,7 @@ def plot(tc):
             xsec_logs.plot(data, z, c, lw=0.5, alpha=0.75)
         else:
             # Need to get TD from SHP or well header sheet.
-            z = [tc.extents[2]-40]
+            z = [tc.extents[2] - 40]
             xsec_logs.axvline(x=pos, color=well_colour, alpha=0.25)
 
         elevation.axvline(x=pos, color=well_colour, alpha=alpha, lw=lw)
@@ -429,7 +431,7 @@ def plot(tc):
 
     # Log type annotation, top left
     xsec_logs.text(0.01, 0.965,
-                   tc.seismic_log+' log',
+                   tc.seismic_log + ' log',
                    color=c,
                    ha='left', va='top',
                    fontsize=12,
@@ -481,7 +483,7 @@ def plot(tc):
     # With newer (1.0) versions of matplotlib, you can
     # use the "zorder" kwarg to make the image overlay
     # the plot, rather than hide behind it... (e.g. zorder=10)
-    fig.figimage(im, (0.95*fig.bbox.xmax) - w, (0.96*fig.bbox.ymax) - h)
+    fig.figimage(im, (0.95 * fig.bbox.xmax) - w, (0.96 * fig.bbox.ymax) - h)
 
     # Annotate config file and creation date
     plt.figtext(0.950, 0.030, tc.time,
@@ -503,7 +505,7 @@ def plot(tc):
             save_file = tc.config_file.split('.')[0] + '.png'
             if save_file == 'config.png':
                 save_file = 'temp.png'
-        Notice.ok("Saving file "+save_file+"...", hold=True)
+        Notice.ok("Saving file " + save_file + "...", hold=True)
         plt.savefig(save_file, dpi=fig.dpi)
         Notice.ok("Done")
         Notice.warning("The displayed image is not identical to the saved one")
