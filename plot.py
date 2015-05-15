@@ -220,9 +220,10 @@ def plot(tc):
 
     elevation.set_ylim((0, max_height))
     elevation.set_xlim(tc.extents[:2])
+    print "Elevation X-limits, ", tc.extents[:2]
     elevation.set_yticks([0, int(max_height),
                           int(np.amax(tc.elevation.data))])
-    elevation.set_xticklabels([])
+    # elevation.set_xticklabels([])
     elevation.tick_params(axis='y', which='major', labelsize=8)
     elevation.patch.set_alpha(0.1)
     elevation.set_ylabel("Elevation [m]", fontsize=8)
@@ -247,12 +248,13 @@ def plot(tc):
     # Seismic cross section
     # ------------------------------------------------------------#
     print "Seismic"
+    print "seismic trace coords", tc.seismic.coords
     for coords, data in zip(tc.seismic.coords, tc.seismic.data):
 
         max_z = data["traces"].shape[0] * data["sample_interval"]
         im = xsection.imshow(data["traces"],
-                             extent=[np.amin(coords) / 1000.0,
-                                     np.amax(coords) / 1000.0,
+                             extent=[np.amin(coords),  # / 1000.0,
+                                     np.amax(coords),  # / 1000.0,
                                      max_z, 0],
                              aspect="auto", cmap=tc.seismic_cmap)
 
@@ -261,7 +263,9 @@ def plot(tc):
     for i, (horizon, data) in enumerate(tc.horizons.data.items()):
 
         coords = tc.horizons.coords[horizon]
-        xsection.scatter(coords/1000, data,
+        print "Horizon COORDS", coords
+        xsection.scatter(coords,  # /1000.0,
+                         data,
                          color=colours[i],
                          marker='.')
 
@@ -273,7 +277,7 @@ def plot(tc):
                       va='center', fontsize=12)
 
     # Axes etc.
-    plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
+    plot_axis = [tc.extents[0], tc.extents[1],
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
     xsection.set_xticklabels([])
@@ -288,7 +292,6 @@ def plot(tc):
     xsection.set_frame_on(False)
 
     # Seismic colorbar
-    """
     colorbar_ax = add_subplot_axes(xsection, [0.975, 0.025, 0.01, 0.1])
     fig.colorbar(im, cax=colorbar_ax)
     colorbar_ax.text(0.5, 0.9, "+",
@@ -307,7 +310,7 @@ def plot(tc):
                   ha='left', va='top',
                   fontsize=12, weight='bold',
                   transform=xsec_logs.transAxes)
-    """
+
     # Potential field data
     # -----------------------------------------------------------#
     print "Potfields"
@@ -356,6 +359,12 @@ def plot(tc):
     potfield.set_yticks([])
     potfield.xaxis.grid(True, which='major')
     potfield.tick_params(axis='x', which='major', labelsize=10)
+
+    # Display x-ticklabels in km instead of metres
+    labels = potfield.get_xticks().tolist()
+    xlabels = [int(label) / 1000 for label in labels]
+    potfield.set_xticklabels(xlabels)
+
     potfield.set_xlabel("Transect range [km]", fontsize=10, ha='center')
 
     potfield.text(0.01, 1.0, "Potential fields",
@@ -384,6 +393,40 @@ def plot(tc):
             alpha, lw = 0.25, 1.0
             weight = 'normal'
 
+        if name == "P-129":  # This is a hack because we only have one file with tops
+            tops = utils.get_tops(tc.tops_file)
+            print tops
+            # plot tops on the well track:
+            for mkr, md in tops.iteritems():
+                # Get domain conversion working
+                # if tc.domain.lower() in ['time', 'twt', 'twtt', 't']:
+                #    md = tc.seismic.velocity.depth2time(depth, pos, dz=depth, dt=dt)
+                #    print 'after time conv:', mkr + ': ' + md
+                xsec_logs.scatter(x=pos,
+                                  y=md,
+                                  marker='_',
+                                  s=50,
+                                  color='b',
+                                  alpha=1.0,
+                                  zorder=2000)
+
+                # draw text box at the right edge of the last track
+                pad = 300.0  # pushes the labels slightly off to the right (map units)
+                xsec_logs.text(x=pos + pad,
+                               y=md,
+                               s=mkr,  # add precluding space for asthetics
+                               alpha=0.75,
+                               color='k',
+                               fontsize='8',
+                               horizontalalignment='left',
+                               verticalalignment='center',
+                               zorder=1000,
+                               bbox=dict(facecolor='white',
+                                         edgecolor='k',
+                                         alpha=0.5,
+                                         lw=0.25),
+                               weight='light')
+
         if las:
             data = np.nan_to_num(las.data[tc.seismic_log])
             data /= np.amax(data)
@@ -393,7 +436,7 @@ def plot(tc):
                 dt = 0.001
                 data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
                 start = tc.seismic.velocity.depth2timept(las.start, pos)
-                z = np.arange(0, len(data), 1) + 1000 * start  # ms
+                z = np.arange(0, len(data), 1) + 1000.0 * start  # ms
 
             # Some post-processing for display
             lgsc = 0.015  # hack to compress the log width
@@ -414,7 +457,8 @@ def plot(tc):
             xsec_logs.axvline(x=pos, color=well_colour, alpha=0.25)
 
         elevation.axvline(x=pos, color=well_colour, alpha=alpha, lw=lw)
-        potfield.axvline(x=pos/1000, color=well_colour, alpha=alpha, lw=lw)
+        potfield.axvline(x=pos,  #/1000.,
+                         color=well_colour, alpha=alpha, lw=lw)
 
         # Well name annotation
         elevation.text(pos, max_height-10,
@@ -425,9 +469,7 @@ def plot(tc):
                        fontsize=10,
                        weight=weight)
 
-    xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
-    xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
-    xsec_logs.axis("off")
+    xsec_logs.set_xticks([])
 
     # Log type annotation, top left
     xsec_logs.text(0.01, 0.965,
