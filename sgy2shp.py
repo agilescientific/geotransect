@@ -58,8 +58,9 @@ def sgy2shp(input_dir, output_dir, convert=False):
 
     line_out_file = os.path.join(output_dir, "seismic_lines.shp")
 
-    if os.path.exists(line_out_file):
-        raise ShapeFileExists
+    # If we want to prevent re-creating the SHP files.
+    # if os.path.exists(line_out_file):
+    #     raise ShapeFileExists
 
     # Set up the shapefile schema.
     line_schema = {'geometry': 'LineString',

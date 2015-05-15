@@ -251,8 +251,8 @@ def plot(tc):
 
         max_z = data["traces"].shape[0] * data["sample_interval"]
         im = xsection.imshow(data["traces"],
-                             extent=[np.amin(coords) / 1000.0,
-                                     np.amax(coords) / 1000.0,
+                             extent=[np.amin(coords),
+                                     np.amax(coords),
                                      max_z, 0],
                              aspect="auto", cmap=tc.seismic_cmap)
 
@@ -273,7 +273,8 @@ def plot(tc):
                       va='center', fontsize=12)
 
     # Axes etc.
-    plot_axis = [tc.extents[0] / 1000., tc.extents[1] / 1000.,
+    plot_axis = [tc.extents[0],
+                 tc.extents[1],
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
     xsection.set_xticklabels([])
@@ -288,7 +289,6 @@ def plot(tc):
     xsection.set_frame_on(False)
 
     # Seismic colorbar
-    """
     colorbar_ax = add_subplot_axes(xsection, [0.975, 0.025, 0.01, 0.1])
     fig.colorbar(im, cax=colorbar_ax)
     colorbar_ax.text(0.5, 0.9, "+",
@@ -307,7 +307,7 @@ def plot(tc):
                   ha='left', va='top',
                   fontsize=12, weight='bold',
                   transform=xsec_logs.transAxes)
-    """
+
     # Potential field data
     # -----------------------------------------------------------#
     print "Potfields"

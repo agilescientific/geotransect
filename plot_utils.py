@@ -119,8 +119,9 @@ def add_subplot_axes(ax, rect, axisbg='w'):
         fig = axis.figure
 
         def transform(coord):
-            return fig.transFigure.inverted().transform(
-                axis.transAxes.transform(coord))
+            a = axis.transAxes.transform(coord)
+            return fig.transFigure.inverted().transform(a)
+
         return transform
 
     fig = plt.gcf()
