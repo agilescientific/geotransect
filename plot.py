@@ -220,10 +220,9 @@ def plot(tc):
 
     elevation.set_ylim((0, max_height))
     elevation.set_xlim(tc.extents[:2])
-    print "Elevation X-limits, ", tc.extents[:2]
     elevation.set_yticks([0, int(max_height),
                           int(np.amax(tc.elevation.data))])
-    # elevation.set_xticklabels([])
+    elevation.set_xticklabels([])
     elevation.tick_params(axis='y', which='major', labelsize=8)
     elevation.patch.set_alpha(0.1)
     elevation.set_ylabel("Elevation [m]", fontsize=8)
@@ -248,13 +247,12 @@ def plot(tc):
     # Seismic cross section
     # ------------------------------------------------------------#
     print "Seismic"
-    print "seismic trace coords", tc.seismic.coords
     for coords, data in zip(tc.seismic.coords, tc.seismic.data):
 
         max_z = data["traces"].shape[0] * data["sample_interval"]
         im = xsection.imshow(data["traces"],
-                             extent=[np.amin(coords),  # / 1000.0,
-                                     np.amax(coords),  # / 1000.0,
+                             extent=[np.amin(coords),
+                                     np.amax(coords),
                                      max_z, 0],
                              aspect="auto", cmap=tc.seismic_cmap)
 
@@ -277,7 +275,8 @@ def plot(tc):
                       va='center', fontsize=12)
 
     # Axes etc.
-    plot_axis = [tc.extents[0], tc.extents[1],
+    plot_axis = [tc.extents[0],
+                 tc.extents[1],
                  tc.extents[2], tc.extents[3]]
     xsection.axis(plot_axis)
     xsection.set_xticklabels([])
@@ -436,7 +435,7 @@ def plot(tc):
                 dt = 0.001
                 data = tc.seismic.velocity.depth2time(data, pos, dz=z, dt=dt)
                 start = tc.seismic.velocity.depth2timept(las.start, pos)
-                z = np.arange(0, len(data), 1) + 1000.0 * start  # ms
+                z = np.arange(0, len(data), 1) + 1000 * start  # ms
 
             # Some post-processing for display
             lgsc = 0.015  # hack to compress the log width
@@ -469,7 +468,9 @@ def plot(tc):
                        fontsize=10,
                        weight=weight)
 
-    xsec_logs.set_xticks([])
+    xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
+    xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
+    xsec_logs.axis("off")
 
     # Log type annotation, top left
     xsec_logs.text(0.01, 0.965,
