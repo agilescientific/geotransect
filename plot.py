@@ -261,7 +261,9 @@ def plot(tc):
     for i, (horizon, data) in enumerate(tc.horizons.data.items()):
 
         coords = tc.horizons.coords[horizon]
-        xsection.scatter(coords/1000, data,
+        print "Horizon COORDS", coords
+        xsection.scatter(coords,  # /1000.0,
+                         data,
                          color=colours[i],
                          marker='.')
 
@@ -356,6 +358,12 @@ def plot(tc):
     potfield.set_yticks([])
     potfield.xaxis.grid(True, which='major')
     potfield.tick_params(axis='x', which='major', labelsize=10)
+
+    # Display x-ticklabels in km instead of metres
+    labels = potfield.get_xticks().tolist()
+    xlabels = [int(label) / 1000 for label in labels]
+    potfield.set_xticklabels(xlabels)
+
     potfield.set_xlabel("Transect range [km]", fontsize=10, ha='center')
 
     potfield.text(0.01, 1.0, "Potential fields",
@@ -383,6 +391,40 @@ def plot(tc):
         else:
             alpha, lw = 0.25, 1.0
             weight = 'normal'
+
+        if name == "P-129":  # This is a hack because we only have one file with tops
+            tops = utils.get_tops(tc.tops_file)
+            print tops
+            # plot tops on the well track:
+            for mkr, md in tops.iteritems():
+                # Get domain conversion working
+                # if tc.domain.lower() in ['time', 'twt', 'twtt', 't']:
+                #    md = tc.seismic.velocity.depth2time(depth, pos, dz=depth, dt=dt)
+                #    print 'after time conv:', mkr + ': ' + md
+                xsec_logs.scatter(x=pos,
+                                  y=md,
+                                  marker='_',
+                                  s=50,
+                                  color='b',
+                                  alpha=1.0,
+                                  zorder=2000)
+
+                # draw text box at the right edge of the last track
+                pad = 300.0  # pushes the labels slightly off to the right (map units)
+                xsec_logs.text(x=pos + pad,
+                               y=md,
+                               s=mkr,  # add precluding space for asthetics
+                               alpha=0.75,
+                               color='k',
+                               fontsize='8',
+                               horizontalalignment='left',
+                               verticalalignment='center',
+                               zorder=1000,
+                               bbox=dict(facecolor='white',
+                                         edgecolor='k',
+                                         alpha=0.5,
+                                         lw=0.25),
+                               weight='light')
 
         if las:
             data = np.nan_to_num(las.data[tc.seismic_log])
@@ -414,7 +456,8 @@ def plot(tc):
             xsec_logs.axvline(x=pos, color=well_colour, alpha=0.25)
 
         elevation.axvline(x=pos, color=well_colour, alpha=alpha, lw=lw)
-        potfield.axvline(x=pos/1000, color=well_colour, alpha=alpha, lw=lw)
+        potfield.axvline(x=pos,  #/1000.,
+                         color=well_colour, alpha=alpha, lw=lw)
 
         # Well name annotation
         elevation.text(pos, max_height-10,
@@ -427,7 +470,7 @@ def plot(tc):
 
     xsec_logs.set_xlim((tc.extents[0], tc.extents[1]))
     xsec_logs.set_ylim((tc.extents[2], tc.extents[3]))
-    xsec_logs.axis("off")
+    xsec_logs.set_xticks([])
 
     # Log type annotation, top left
     xsec_logs.text(0.01, 0.965,
