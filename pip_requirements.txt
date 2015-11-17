@@ -1,0 +1,3 @@
+agilegeo==0.1.6
+obspy==0.10.2
+striplog==0.4.2

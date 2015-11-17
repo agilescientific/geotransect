@@ -3,7 +3,18 @@ Tool for visualizing subsurface data along 2D transects.
 
 [![Codacy Badge](https://www.codacy.com/project/badge/83d94f2a212c46b291c9e8c72ba6ed3f)](https://www.codacy.com/app/matt/geotransect_2)
 
+## Creating an envrironment
+Best thing is to install Continuum's Anaconda. Then, from this directory:
+
+    conda create -n geotransect --file conda_requirements.txt
+    source activate geotransect
+    pip install -r pip_requirements.txt
+
+    python transect.py -c my_config.yaml
+
 ## Dependencies
+Hopefully the evironment 'just worked' but if not, you might have to install dependencies by hand...
+
 Some of these dependencies have dependencies of their own, some of which are substantial and need compiling. If you're on a Mac, I recommend using Homebrew for the tricky things like gdal and PROJ4.
 
 - [pyproj](https://pypi.python.org/pypi/pyproj)
