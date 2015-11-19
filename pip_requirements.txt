@@ -1,3 +1,7 @@
-agilegeo==0.1.6
+# If this doesn't work, try
+#    conda install -c obspy obspy
+# per https://github.com/obspy/obspy/wiki/Installation-via-Anaconda
 obspy==0.10.2
+# Agile stuff
+agilegeo==0.1.6
 striplog==0.4.2
